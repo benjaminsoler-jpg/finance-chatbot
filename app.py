@@ -186,8 +186,20 @@ class FinancialChatbot:
         # Aplicar filtros
         filtered_df = self.apply_filters(filters)
         
+        # Si no hay datos con filtros estrictos, intentar con filtros más flexibles
+        if len(filtered_df) == 0 and filters:
+            # Intentar con menos filtros
+            for key in list(filters.keys()):
+                temp_filters = filters.copy()
+                del temp_filters[key]
+                temp_df = self.apply_filters(temp_filters)
+                if len(temp_df) > 0:
+                    filtered_df = temp_df
+                    break
+        
+        # Si aún no hay datos, usar todos los datos
         if len(filtered_df) == 0:
-            return "No se encontraron datos con los filtros especificados."
+            filtered_df = self.df.copy()
         
         # Generar análisis
         analysis = self.generate_analysis(query, filtered_df, filters)
@@ -213,6 +225,10 @@ class FinancialChatbot:
                 analysis += f"  - {col}: {val}\n"
             analysis += "\n"
         
+        # Si no se encontraron datos con filtros exactos, mostrar datos relacionados
+        if len(df) != len(self.df):
+            analysis += "ℹ️ **Nota:** Se muestran datos relacionados ya que no se encontraron registros con todos los filtros exactos.\n\n"
+        
         # Análisis por negocio
         if 'Negocio' in df.columns and 'Valor' in df.columns:
             negocio_analysis = df.groupby('Negocio')['Valor'].sum().sort_values(ascending=False)
@@ -230,6 +246,33 @@ class FinancialChatbot:
                 porcentaje = (valor / total_value) * 100 if total_value > 0 else 0
                 analysis += f"  - {concepto}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
             analysis += "\n"
+            
+            # Análisis específico de Originacion si se menciona
+            if 'originacion' in query.lower() or 'originación' in query.lower():
+                originacion_data = df[df['Concepto'].str.contains('Originacion', case=False, na=False)]
+                if len(originacion_data) > 0:
+                    originacion_total = originacion_data['Valor'].sum()
+                    analysis += "🎯 **Análisis Específico de Originación:**\n"
+                    analysis += f"💰 Valor total de Originación: ${originacion_total:,.2f}\n"
+                    analysis += f"📊 Registros de Originación: {len(originacion_data):,}\n\n"
+                    
+                    # Por negocio
+                    if 'Negocio' in originacion_data.columns:
+                        orig_negocio = originacion_data.groupby('Negocio')['Valor'].sum().sort_values(ascending=False)
+                        analysis += "🏢 **Originación por Negocio:**\n"
+                        for negocio, valor in orig_negocio.items():
+                            porcentaje = (valor / originacion_total) * 100 if originacion_total > 0 else 0
+                            analysis += f"  - {negocio}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+                        analysis += "\n"
+                    
+                    # Por cohorte
+                    if 'Cohort_Act' in originacion_data.columns:
+                        orig_cohorte = originacion_data.groupby('Cohort_Act')['Valor'].sum().sort_values(ascending=False)
+                        analysis += "📈 **Originación por Cohorte:**\n"
+                        for cohorte, valor in orig_cohorte.items():
+                            porcentaje = (valor / originacion_total) * 100 if originacion_total > 0 else 0
+                            analysis += f"  - {cohorte}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+                        analysis += "\n"
         
         # Análisis por cohorte
         if 'Cohort_Act' in df.columns and 'Valor' in df.columns:
