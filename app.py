@@ -92,8 +92,9 @@ class FinancialChatbot:
             
             # Limpiar datos
             self.df.columns = self.df.columns.str.strip()
-            self.df['Valor'] = self.df['Valor'].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
-            self.df['Valor'] = pd.to_numeric(self.df['Valor'], errors='coerce')
+            # Convertir a enteros: quitar comas, convertir a float, luego a int
+            self.df['Valor'] = self.df['Valor'].astype(str).str.replace(',', '')
+            self.df['Valor'] = pd.to_numeric(self.df['Valor'], errors='coerce').fillna(0).astype(int)
             self.df.dropna(subset=['Valor'], inplace=True)
             
             st.success(f"✅ Datos cargados: {len(self.df):,} registros")
@@ -257,7 +258,7 @@ class FinancialChatbot:
         total_records = len(df)
         
         analysis = f"📊 **Análisis de Datos:**\n"
-        analysis += f"💰 Valor total: ${total_value:,.2f}\n"
+        analysis += f"💰 Valor total: ${total_value:,}\n"
         analysis += f"📊 Registros: {total_records:,}\n\n"
         
         # Mostrar filtros aplicados
@@ -271,13 +272,23 @@ class FinancialChatbot:
         if len(df) != len(self.df):
             analysis += "ℹ️ **Nota:** Se muestran datos relacionados ya que no se encontraron registros con todos los filtros exactos.\n\n"
         
+        # Verificar si el concepto específico tiene valores válidos
+        if 'Concepto' in filters:
+            concepto_especifico = filters['Concepto']
+            concepto_data = df[df['Concepto'].str.contains(concepto_especifico, case=False, na=False)]
+            if len(concepto_data) > 0:
+                # Verificar si hay valores no nulos para este concepto
+                valores_validos = concepto_data['Valor'].dropna()
+                if len(valores_validos) == 0:
+                    analysis += f"⚠️ **Advertencia:** El concepto '{concepto_especifico}' no tiene valores válidos (todos son nulos).\n\n"
+        
         # Análisis por negocio
         if 'Negocio' in df.columns and 'Valor' in df.columns:
             negocio_analysis = df.groupby('Negocio')['Valor'].sum().sort_values(ascending=False)
             analysis += "🏢 **Por Negocio:**\n"
             for negocio, valor in negocio_analysis.items():
                 porcentaje = (valor / total_value) * 100 if total_value > 0 else 0
-                analysis += f"  - {negocio}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+                analysis += f"  - {negocio}: ${valor:,} ({porcentaje:.1f}%)\n"
             analysis += "\n"
         
         # Análisis por concepto
@@ -286,7 +297,7 @@ class FinancialChatbot:
             analysis += "📋 **Por Concepto:**\n"
             for concepto, valor in concepto_analysis.items():
                 porcentaje = (valor / total_value) * 100 if total_value > 0 else 0
-                analysis += f"  - {concepto}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+                analysis += f"  - {concepto}: ${valor:,} ({porcentaje:.1f}%)\n"
             analysis += "\n"
             
             # Análisis específico de Originacion si se menciona
@@ -310,7 +321,7 @@ class FinancialChatbot:
                         analysis += "🏢 **Originación por Negocio:**\n"
                         for negocio, valor in orig_negocio.items():
                             porcentaje = (valor / originacion_total) * 100 if originacion_total > 0 else 0
-                            analysis += f"  - {negocio}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+                            analysis += f"  - {negocio}: ${valor:,} ({porcentaje:.1f}%)\n"
                         analysis += "\n"
                     
                     # Por cohorte
@@ -319,7 +330,7 @@ class FinancialChatbot:
                         analysis += "📈 **Originación por Cohorte:**\n"
                         for cohorte, valor in orig_cohorte.items():
                             porcentaje = (valor / originacion_total) * 100 if originacion_total > 0 else 0
-                            analysis += f"  - {cohorte}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+                            analysis += f"  - {cohorte}: ${valor:,} ({porcentaje:.1f}%)\n"
                         analysis += "\n"
         
         # Análisis por cohorte
@@ -328,7 +339,7 @@ class FinancialChatbot:
             analysis += "📈 **Por Cohorte:**\n"
             for cohorte, valor in cohorte_analysis.items():
                 porcentaje = (valor / total_value) * 100 if total_value > 0 else 0
-                analysis += f"  - {cohorte}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+                analysis += f"  - {cohorte}: ${valor:,} ({porcentaje:.1f}%)\n"
             analysis += "\n"
         
         # Análisis por clasificación
@@ -337,7 +348,7 @@ class FinancialChatbot:
             analysis += "🏷️ **Por Clasificación:**\n"
             for clasif, valor in clasif_analysis.items():
                 porcentaje = (valor / total_value) * 100 if total_value > 0 else 0
-                analysis += f"  - {clasif}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+                analysis += f"  - {clasif}: ${valor:,} ({porcentaje:.1f}%)\n"
             analysis += "\n"
         
         # Análisis por período si se solicita "últimos N períodos"
@@ -347,7 +358,7 @@ class FinancialChatbot:
                 analysis += "📅 **Análisis por Período:**\n"
                 for periodo, valor in periodo_analysis.items():
                     porcentaje = (valor / total_value * 100) if total_value > 0 else 0
-                    analysis += f"  - {periodo}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+                    analysis += f"  - {periodo}: ${valor:,} ({porcentaje:.1f}%)\n"
                 analysis += "\n"
         
         # Análisis por escenario
@@ -356,7 +367,7 @@ class FinancialChatbot:
             analysis += "🎯 **Por Escenario:**\n"
             for escenario, valor in escenario_analysis.items():
                 porcentaje = (valor / total_value) * 100 if total_value > 0 else 0
-                analysis += f"  - {escenario}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+                analysis += f"  - {escenario}: ${valor:,} ({porcentaje:.1f}%)\n"
             analysis += "\n"
         
         # Análisis por período
@@ -365,7 +376,7 @@ class FinancialChatbot:
             analysis += "📅 **Por Período:**\n"
             for periodo, valor in periodo_analysis.items():
                 porcentaje = (valor / total_value) * 100 if total_value > 0 else 0
-                analysis += f"  - {periodo}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+                analysis += f"  - {periodo}: ${valor:,} ({porcentaje:.1f}%)\n"
             analysis += "\n"
         
         return analysis
@@ -405,7 +416,7 @@ class FinancialChatbot:
                 cohorte = row['Cohort_Act'] if pd.notna(row['Cohort_Act']) else 'Sin cohorte'
                 valor = row['Valor']
                 porcentaje = (valor / total_negocio) * 100 if total_negocio > 0 else 0
-                analysis += f"  📈 {cohorte}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+                analysis += f"  📈 {cohorte}: ${valor:,} ({porcentaje:.1f}%)\n"
             analysis += "\n"
         
         return analysis
@@ -454,7 +465,7 @@ class FinancialChatbot:
                 cohorte = row['Cohort_Act'] if pd.notna(row['Cohort_Act']) else 'Sin cohorte'
                 valor = row['Valor']
                 porcentaje = (valor / total_negocio) * 100 if total_negocio > 0 else 0
-                analysis += f"  📈 {cohorte}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+                analysis += f"  📈 {cohorte}: ${valor:,} ({porcentaje:.1f}%)\n"
             analysis += "\n"
         
         return analysis
