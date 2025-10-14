@@ -131,6 +131,12 @@ class FinancialChatbot:
             if periodo_match:
                 filters['Periodo'] = periodo_match.group(1) + '-01-2025'
         
+        # Extraer lógica de "últimos N períodos"
+        if 'ultimos' in query_lower and ('periodos' in query_lower or 'períodos' in query_lower):
+            ultimos_match = re.search(r'ultimos?\s+(\d+)\s+periodos?', query_lower)
+            if ultimos_match:
+                filters['ultimos_periodos'] = int(ultimos_match.group(1))
+        
         # Extraer negocios
         negocios = re.findall(self.patterns['negocios'], query, re.IGNORECASE)
         if negocios:
@@ -171,6 +177,20 @@ class FinancialChatbot:
         
         filtered_df = self.df.copy()
         
+        # Manejar lógica especial de "últimos N períodos"
+        if 'ultimos_periodos' in filters and 'Elaboracion' in filters:
+            ultimos_periodos = filters['ultimos_periodos']
+            elaboracion = filters['Elaboracion']
+            
+            # Calcular períodos anteriores
+            periodos_anteriores = self._get_periodos_anteriores(elaboracion, ultimos_periodos)
+            
+            # Filtrar por períodos específicos
+            filtered_df = filtered_df[filtered_df['Periodo'].isin(periodos_anteriores)]
+            
+            # Remover el filtro especial para no aplicarlo dos veces
+            filters = {k: v for k, v in filters.items() if k != 'ultimos_periodos'}
+        
         for column, value in filters.items():
             if column in filtered_df.columns:
                 if column == 'Cohort_Act' and value == '<2024':
@@ -179,6 +199,23 @@ class FinancialChatbot:
                     filtered_df = filtered_df[filtered_df[column] == value]
         
         return filtered_df
+    
+    def _get_periodos_anteriores(self, elaboracion, cantidad):
+        """Calcular los últimos N períodos anteriores a una elaboración"""
+        import datetime
+        
+        # Extraer mes de la elaboración (formato: MM-01-2025)
+        mes_elaboracion = int(elaboracion.split('-')[0])
+        
+        # Calcular períodos anteriores
+        periodos = []
+        for i in range(cantidad):
+            mes_anterior = mes_elaboracion - i - 1
+            if mes_anterior <= 0:
+                mes_anterior += 12
+            periodos.append(f"{mes_anterior:02d}-01-2025")
+        
+        return periodos
     
     def analyze_data(self, query: str) -> str:
         """Análisis inteligente de datos del CSV"""
@@ -302,6 +339,16 @@ class FinancialChatbot:
                 porcentaje = (valor / total_value) * 100 if total_value > 0 else 0
                 analysis += f"  - {clasif}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
             analysis += "\n"
+        
+        # Análisis por período si se solicita "últimos N períodos"
+        if 'ultimos_periodos' in filters:
+            if 'Periodo' in df.columns:
+                periodo_analysis = df.groupby('Periodo')['Valor'].sum().sort_index(ascending=False)
+                analysis += "📅 **Análisis por Período:**\n"
+                for periodo, valor in periodo_analysis.items():
+                    porcentaje = (valor / total_value * 100) if total_value > 0 else 0
+                    analysis += f"  - {periodo}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+                analysis += "\n"
         
         # Análisis por escenario
         if 'Escenario' in df.columns and 'Valor' in df.columns:
