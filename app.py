@@ -56,6 +56,18 @@ class FinancialChatbot:
         self.df = None
         self.load_data()
         self.setup_openai()
+        
+        # Patrones de reconocimiento para análisis inteligente
+        self.patterns = {
+            'fechas': r'\b(0[7-9]|10)-01-2025\b',
+            'periodos': r'\b(0[1-9]|1[0-2])-01-2025\b',
+            'negocios': r'\b(PYME|CORP|Brokers|WK)\b',
+            'conceptos': r'\b(Originacion|Resultado Comercial|Churn|Clientes|AD Rate|AD Revenue|Cost of Fund|Cost of Risk|Fund Rate|Gross Revenue|Int Rate|Interest Revenue|Margen Financiero|NTR|Originacion Prom|Rate All In|Risk Rate|Spread|Term)\b',
+            'clasificaciones': r'\b(Active|New Active|Old Active|Old Operados|Total Operados|Churn Bruto|Churn Bruto Acum|Churn Bruto Act|Churn Bruto Rec|Churn Neto|Activacion|Recurrencia)\b',
+            'cohortes': r'\b(2024|2025|<2024)\b',
+            'escenarios': r'\b(Moderado|Ambicion)\b',
+            'paises': r'\b(CL|Chile)\b'
+        }
     
     def load_data(self):
         """Cargar datos del CSV"""
@@ -99,46 +111,163 @@ class FinancialChatbot:
         openai.api_key = api_key
         self.openai_available = True
     
+    def extract_filters(self, query):
+        """Extraer filtros de la consulta usando patrones regex"""
+        import re
+        query_lower = query.lower()
+        filters = {}
+        
+        # Extraer fechas
+        fechas = re.findall(self.patterns['fechas'], query)
+        if fechas:
+            filters['Elaboracion'] = fechas[0]
+        
+        # Extraer períodos
+        periodos = re.findall(self.patterns['periodos'], query)
+        if periodos:
+            filters['Periodo'] = periodos[0]
+        
+        # Extraer negocios
+        negocios = re.findall(self.patterns['negocios'], query, re.IGNORECASE)
+        if negocios:
+            filters['Negocio'] = negocios[0]
+        
+        # Extraer conceptos
+        conceptos = re.findall(self.patterns['conceptos'], query, re.IGNORECASE)
+        if conceptos:
+            filters['Concepto'] = conceptos[0]
+        
+        # Extraer clasificaciones
+        clasificaciones = re.findall(self.patterns['clasificaciones'], query, re.IGNORECASE)
+        if clasificaciones:
+            filters['Clasificación'] = clasificaciones[0]
+        
+        # Extraer cohortes
+        cohortes = re.findall(self.patterns['cohortes'], query)
+        if cohortes:
+            filters['Cohort_Act'] = cohortes[0]
+        
+        # Extraer escenarios
+        escenarios = re.findall(self.patterns['escenarios'], query, re.IGNORECASE)
+        if escenarios:
+            filters['Escenario'] = escenarios[0]
+        
+        # Extraer países
+        paises = re.findall(self.patterns['paises'], query, re.IGNORECASE)
+        if paises:
+            filters['Pais'] = 'CL'
+        
+        return filters
+    
+    def apply_filters(self, filters):
+        """Aplicar filtros al DataFrame"""
+        if not filters:
+            return self.df
+        
+        filtered_df = self.df.copy()
+        
+        for column, value in filters.items():
+            if column in filtered_df.columns:
+                if column == 'Cohort_Act' and value == '<2024':
+                    filtered_df = filtered_df[filtered_df[column] == '<2024']
+                else:
+                    filtered_df = filtered_df[filtered_df[column] == value]
+        
+        return filtered_df
+    
     def analyze_data(self, query: str) -> str:
-        """Análisis de datos del CSV"""
+        """Análisis inteligente de datos del CSV"""
         if self.df is None:
             return "No hay datos disponibles para analizar."
         
+        # Extraer filtros de la consulta
+        filters = self.extract_filters(query)
+        
+        # Aplicar filtros
+        filtered_df = self.apply_filters(filters)
+        
+        if len(filtered_df) == 0:
+            return "No se encontraron datos con los filtros especificados."
+        
+        # Generar análisis
+        analysis = self.generate_analysis(query, filtered_df, filters)
+        
+        return analysis
+    
+    def generate_analysis(self, query, df, filters):
+        """Generar análisis basado en la consulta y filtros"""
         query_lower = query.lower()
         
-        # Análisis por negocio
-        if "negocio" in query_lower or "business" in query_lower:
-            if 'Negocio' in self.df.columns and 'Valor' in self.df.columns:
-                negocio_analysis = self.df.groupby('Negocio')['Valor'].sum().sort_values(ascending=False)
-                return f"📊 **Análisis por Negocio:**\n{negocio_analysis.to_string()}"
+        # Análisis básico
+        total_value = df['Valor'].sum()
+        total_records = len(df)
         
-        # Análisis por país
-        elif "país" in query_lower or "pais" in query_lower or "country" in query_lower:
-            if 'Pais' in self.df.columns and 'Valor' in self.df.columns:
-                pais_analysis = self.df.groupby('Pais')['Valor'].sum().sort_values(ascending=False)
-                return f"🌍 **Análisis por País:**\n{pais_analysis.to_string()}"
+        analysis = f"📊 **Análisis de Datos:**\n"
+        analysis += f"💰 Valor total: ${total_value:,.2f}\n"
+        analysis += f"📊 Registros: {total_records:,}\n\n"
+        
+        # Mostrar filtros aplicados
+        if filters:
+            analysis += "🔍 **Filtros aplicados:**\n"
+            for col, val in filters.items():
+                analysis += f"  - {col}: {val}\n"
+            analysis += "\n"
+        
+        # Análisis por negocio
+        if 'Negocio' in df.columns and 'Valor' in df.columns:
+            negocio_analysis = df.groupby('Negocio')['Valor'].sum().sort_values(ascending=False)
+            analysis += "🏢 **Por Negocio:**\n"
+            for negocio, valor in negocio_analysis.items():
+                porcentaje = (valor / total_value) * 100 if total_value > 0 else 0
+                analysis += f"  - {negocio}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+            analysis += "\n"
         
         # Análisis por concepto
-        elif "concepto" in query_lower or "concept" in query_lower:
-            if 'Concepto' in self.df.columns and 'Valor' in self.df.columns:
-                concepto_analysis = self.df.groupby('Concepto')['Valor'].sum().sort_values(ascending=False)
-                return f"📋 **Análisis por Concepto:**\n{concepto_analysis.to_string()}"
+        if 'Concepto' in df.columns and 'Valor' in df.columns:
+            concepto_analysis = df.groupby('Concepto')['Valor'].sum().sort_values(ascending=False)
+            analysis += "📋 **Por Concepto:**\n"
+            for concepto, valor in concepto_analysis.items():
+                porcentaje = (valor / total_value) * 100 if total_value > 0 else 0
+                analysis += f"  - {concepto}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+            analysis += "\n"
         
         # Análisis por cohorte
-        elif "cohorte" in query_lower or "cohort" in query_lower:
-            if 'Cohort_Act' in self.df.columns and 'Valor' in self.df.columns:
-                cohorte_analysis = self.df.groupby('Cohort_Act')['Valor'].sum().sort_values(ascending=False)
-                return f"📈 **Análisis por Cohorte:**\n{cohorte_analysis.to_string()}"
+        if 'Cohort_Act' in df.columns and 'Valor' in df.columns:
+            cohorte_analysis = df.groupby('Cohort_Act')['Valor'].sum().sort_values(ascending=False)
+            analysis += "📈 **Por Cohorte:**\n"
+            for cohorte, valor in cohorte_analysis.items():
+                porcentaje = (valor / total_value) * 100 if total_value > 0 else 0
+                analysis += f"  - {cohorte}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+            analysis += "\n"
         
-        # Análisis específico por fecha
-        elif "08-01-2025" in query_lower or "elaboración" in query_lower:
-            return self.analyze_specific_date()
+        # Análisis por clasificación
+        if 'Clasificación' in df.columns and 'Valor' in df.columns:
+            clasif_analysis = df.groupby('Clasificación')['Valor'].sum().sort_values(ascending=False)
+            analysis += "🏷️ **Por Clasificación:**\n"
+            for clasif, valor in clasif_analysis.items():
+                porcentaje = (valor / total_value) * 100 if total_value > 0 else 0
+                analysis += f"  - {clasif}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+            analysis += "\n"
         
-        # Resumen general
-        elif "resumen" in query_lower or "summary" in query_lower or "total" in query_lower:
-            return self.get_summary()
+        # Análisis por escenario
+        if 'Escenario' in df.columns and 'Valor' in df.columns:
+            escenario_analysis = df.groupby('Escenario')['Valor'].sum().sort_values(ascending=False)
+            analysis += "🎯 **Por Escenario:**\n"
+            for escenario, valor in escenario_analysis.items():
+                porcentaje = (valor / total_value) * 100 if total_value > 0 else 0
+                analysis += f"  - {escenario}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+            analysis += "\n"
         
-        return ""
+        # Análisis por período
+        if 'Periodo' in df.columns and 'Valor' in df.columns:
+            periodo_analysis = df.groupby('Periodo')['Valor'].sum().sort_values(ascending=False)
+            analysis += "📅 **Por Período:**\n"
+            for periodo, valor in periodo_analysis.items():
+                porcentaje = (valor / total_value) * 100 if total_value > 0 else 0
+                analysis += f"  - {periodo}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+            analysis += "\n"
+        
+        return analysis
     
     def analyze_specific_date(self) -> str:
         """Análisis específico para 08-01-2025"""
@@ -165,6 +294,55 @@ class FinancialChatbot:
         analysis = f"📊 **Resultado Comercial 08-01-2025:**\n"
         analysis += f"💰 Valor total: ${total:,.2f}\n"
         analysis += f"📊 Registros: {len(datos):,}\n\n"
+        
+        for negocio in resultado['Negocio'].unique():
+            negocio_data = resultado[resultado['Negocio'] == negocio]
+            total_negocio = negocio_data['Valor'].sum()
+            analysis += f"🏢 **{negocio}:** ${total_negocio:,.2f}\n"
+            
+            for _, row in negocio_data.iterrows():
+                cohorte = row['Cohort_Act'] if pd.notna(row['Cohort_Act']) else 'Sin cohorte'
+                valor = row['Valor']
+                porcentaje = (valor / total_negocio) * 100 if total_negocio > 0 else 0
+                analysis += f"  📈 {cohorte}: ${valor:,.2f} ({porcentaje:.1f}%)\n"
+            analysis += "\n"
+        
+        return analysis
+    
+    def analyze_originacion(self) -> str:
+        """Análisis específico para Originación"""
+        if self.df is None:
+            return "No hay datos disponibles."
+        
+        # Filtrar datos específicos para Originación
+        filtro = (
+            (self.df['Elaboracion'] == '08-01-2025') &
+            (self.df['Periodo'] == '08-01-2025') &
+            (self.df['Pais'] == 'CL') &
+            (self.df['Escenario'] == 'Moderado')
+        )
+        
+        datos = self.df[filtro]
+        
+        if len(datos) == 0:
+            return "No se encontraron datos para los filtros especificados."
+        
+        # Análisis específico por Originación
+        if 'Concepto' in datos.columns:
+            originacion_data = datos[datos['Concepto'].str.contains('Originación', case=False, na=False)]
+        else:
+            originacion_data = datos
+        
+        if len(originacion_data) == 0:
+            return "No se encontraron datos específicos de Originación para los filtros especificados."
+        
+        # Análisis por negocio y cohorte para Originación
+        resultado = originacion_data.groupby(['Negocio', 'Cohort_Act'])['Valor'].sum().reset_index()
+        total = originacion_data['Valor'].sum()
+        
+        analysis = f"📊 **Análisis de Originación 08-01-2025:**\n"
+        analysis += f"💰 Valor total de Originación: ${total:,.2f}\n"
+        analysis += f"📊 Registros de Originación: {len(originacion_data):,}\n\n"
         
         for negocio in resultado['Negocio'].unique():
             negocio_data = resultado[resultado['Negocio'] == negocio]
@@ -259,11 +437,14 @@ def main():
                 st.write(chatbot.df['Negocio'].unique())
         
         st.header("💡 Consultas Sugeridas")
-        st.write("• 'Análisis por negocio'")
-        st.write("• 'Resumen general'")
-        st.write("• 'Análisis por país'")
-        st.write("• 'Resultado Comercial 08-01-2025'")
-        st.write("• '¿Cuáles son las mejores estrategias de inversión?'")
+        st.write("• 'Originacion PYME 08-01-2025'")
+        st.write("• 'Resultado Comercial CORP 2024'")
+        st.write("• 'Churn WK Moderado'")
+        st.write("• 'Clientes por cohorte'")
+        st.write("• 'Análisis por escenario'")
+        st.write("• 'Valor total por concepto'")
+        st.write("• 'Distribución por negocio'")
+        st.write("• 'Tendencia por período'")
     
     # Chat interface
     st.header("💬 Chat")
