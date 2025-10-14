@@ -290,8 +290,7 @@ def main():
         # Agregar respuesta del bot
         st.session_state.messages.append({"role": "assistant", "content": response})
         
-        # Limpiar input
-        st.session_state.user_input = ""
+        # Recargar la página para mostrar la respuesta
         st.rerun()
     
     # Visualizaciones
