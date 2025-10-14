@@ -117,18 +117,19 @@ class FinancialChatbot:
         query_lower = query.lower()
         filters = {}
         
-        # Extraer fechas (solo para Elaboracion)
+        # Extraer fechas (solo para Elaboracion) - patrón más específico
         if 'elaboracion' in query_lower or 'elaboración' in query_lower:
-            fechas = re.findall(self.patterns['fechas'], query)
-            if fechas:
-                filters['Elaboracion'] = fechas[0]
+            # Buscar el patrón "Elaboracion XX-01-2025"
+            elaboracion_match = re.search(r'elaboracion\s+(\d{2})-01-2025', query_lower)
+            if elaboracion_match:
+                filters['Elaboracion'] = elaboracion_match.group(1) + '-01-2025'
         
-        # Extraer períodos (solo para Periodo)
+        # Extraer períodos (solo para Periodo) - patrón más específico
         if 'periodo' in query_lower or 'período' in query_lower:
-            periodos = re.findall(self.patterns['periodos'], query)
-            if periodos:
-                # Tomar el último período mencionado (más específico)
-                filters['Periodo'] = periodos[-1]
+            # Buscar el patrón "periodo XX-01-2025"
+            periodo_match = re.search(r'periodo\s+(\d{2})-01-2025', query_lower)
+            if periodo_match:
+                filters['Periodo'] = periodo_match.group(1) + '-01-2025'
         
         # Extraer negocios
         negocios = re.findall(self.patterns['negocios'], query, re.IGNORECASE)
@@ -145,10 +146,11 @@ class FinancialChatbot:
         if clasificaciones:
             filters['Clasificación'] = clasificaciones[0]
         
-        # Extraer cohortes
-        cohortes = re.findall(self.patterns['cohortes'], query)
-        if cohortes:
-            filters['Cohort_Act'] = cohortes[0]
+        # Extraer cohortes (solo si se menciona explícitamente)
+        if 'cohorte' in query_lower or 'cohort' in query_lower:
+            cohortes = re.findall(self.patterns['cohortes'], query)
+            if cohortes:
+                filters['Cohort_Act'] = cohortes[0]
         
         # Extraer escenarios
         escenarios = re.findall(self.patterns['escenarios'], query, re.IGNORECASE)
