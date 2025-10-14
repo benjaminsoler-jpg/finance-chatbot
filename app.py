@@ -117,15 +117,18 @@ class FinancialChatbot:
         query_lower = query.lower()
         filters = {}
         
-        # Extraer fechas
-        fechas = re.findall(self.patterns['fechas'], query)
-        if fechas:
-            filters['Elaboracion'] = fechas[0]
+        # Extraer fechas (solo para Elaboracion)
+        if 'elaboracion' in query_lower or 'elaboración' in query_lower:
+            fechas = re.findall(self.patterns['fechas'], query)
+            if fechas:
+                filters['Elaboracion'] = fechas[0]
         
-        # Extraer períodos
-        periodos = re.findall(self.patterns['periodos'], query)
-        if periodos:
-            filters['Periodo'] = periodos[0]
+        # Extraer períodos (solo para Periodo)
+        if 'periodo' in query_lower or 'período' in query_lower:
+            periodos = re.findall(self.patterns['periodos'], query)
+            if periodos:
+                # Tomar el último período mencionado (más específico)
+                filters['Periodo'] = periodos[-1]
         
         # Extraer negocios
         negocios = re.findall(self.patterns['negocios'], query, re.IGNORECASE)
@@ -254,7 +257,13 @@ class FinancialChatbot:
                     originacion_total = originacion_data['Valor'].sum()
                     analysis += "🎯 **Análisis Específico de Originación:**\n"
                     analysis += f"💰 Valor total de Originación: ${originacion_total:,.2f}\n"
-                    analysis += f"📊 Registros de Originación: {len(originacion_data):,}\n\n"
+                    analysis += f"📊 Registros de Originación: {len(originacion_data):,}\n"
+                    
+                    # Debug: mostrar algunos valores para verificar
+                    if originacion_total == 0:
+                        analysis += f"⚠️ **Debug:** Primeros 5 valores de Originación: {originacion_data['Valor'].head().tolist()}\n"
+                        analysis += f"⚠️ **Debug:** Tipos de datos: {originacion_data['Valor'].dtype}\n"
+                    analysis += "\n"
                     
                     # Por negocio
                     if 'Negocio' in originacion_data.columns:
