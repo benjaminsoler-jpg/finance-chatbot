@@ -613,8 +613,15 @@ class FinancialChatbot:
         # Agregar storytelling ejecutivo
         analysis += self._generate_rolling_storytelling(elaboracion_prediccion, elaboracion_realidad, periodo, separar_por_negocio, negocios)
         
-        # Agregar gráficos interactivos
-        analysis += self._generate_rolling_visualizations(elaboracion_prediccion, elaboracion_realidad, periodo, separar_por_negocio, negocios)
+        # Marcar que se deben generar gráficos
+        analysis += "---\n\n"
+        analysis += "## 📊 **VISUALIZACIONES INTERACTIVAS**\n\n"
+        analysis += "**GENERATE_ROLLING_CHARTS:**\n"
+        analysis += f"elaboracion_prediccion={elaboracion_prediccion}\n"
+        analysis += f"elaboracion_realidad={elaboracion_realidad}\n"
+        analysis += f"periodo={periodo}\n"
+        analysis += f"separar_por_negocio={separar_por_negocio}\n"
+        analysis += f"negocios={negocios}\n"
         
         return analysis
     
@@ -3566,6 +3573,55 @@ def main():
                 content_html = message["content"].replace('\n', '<br>')
                 st.markdown(f'<div class="chat-message bot-message">🤖 **Bot:** {content_html}</div>', unsafe_allow_html=True)
     
+    # Generar gráficos rolling si están en session_state
+    if 'generate_rolling_charts' in st.session_state:
+        params = st.session_state.generate_rolling_charts
+        st.markdown("---")
+        st.markdown("## 📊 **VISUALIZACIONES INTERACTIVAS**")
+        
+        # 1. Gráfico de comparación
+        st.markdown("### 📈 **Gráfico 1: Comparación Predicción vs Realidad por Variable**")
+        chatbot._create_rolling_comparison_chart(
+            params['elaboracion_prediccion'], 
+            params['elaboracion_realidad'], 
+            params['periodo'], 
+            params['separar_por_negocio'], 
+            params['negocios']
+        )
+        
+        # 2. Gráfico de precisión
+        st.markdown("### 🎯 **Gráfico 2: Precisión Predictiva por Segmento**")
+        chatbot._create_rolling_accuracy_chart(
+            params['elaboracion_prediccion'], 
+            params['elaboracion_realidad'], 
+            params['periodo'], 
+            params['separar_por_negocio'], 
+            params['negocios']
+        )
+        
+        # 3. Heatmap
+        st.markdown("### 🔥 **Gráfico 3: Heatmap de Desviaciones por Cohort**")
+        chatbot._create_rolling_heatmap_chart(
+            params['elaboracion_prediccion'], 
+            params['elaboracion_realidad'], 
+            params['periodo'], 
+            params['separar_por_negocio'], 
+            params['negocios']
+        )
+        
+        # 4. Gráfico de tendencias (solo si separar por negocio)
+        if params['separar_por_negocio']:
+            st.markdown("### 📊 **Gráfico 4: Tendencias por Segmento de Negocio**")
+            chatbot._create_rolling_trends_chart(
+                params['elaboracion_prediccion'], 
+                params['elaboracion_realidad'], 
+                params['periodo'], 
+                params['negocios']
+            )
+        
+        # Limpiar session_state
+        del st.session_state.generate_rolling_charts
+    
     # Input de usuario
     user_input = st.text_input("Escribe tu consulta:", key="user_input")
     
@@ -3579,6 +3635,28 @@ def main():
         
         # Agregar respuesta del bot
         st.session_state.messages.append({"role": "assistant", "content": response})
+        
+        # Detectar si se deben generar gráficos rolling
+        if "**GENERATE_ROLLING_CHARTS:**" in response:
+            # Extraer parámetros
+            lines = response.split('\n')
+            params = {}
+            for line in lines:
+                if '=' in line and not line.startswith('**'):
+                    key, value = line.split('=', 1)
+                    if key == 'negocios':
+                        # Convertir string de lista a lista real
+                        value = value.strip("[]").replace("'", "").split(', ')
+                        value = [v.strip() for v in value if v.strip()]
+                    elif value.lower() == 'true':
+                        value = True
+                    elif value.lower() == 'false':
+                        value = False
+                    params[key] = value
+            
+            # Generar gráficos
+            if all(k in params for k in ['elaboracion_prediccion', 'elaboracion_realidad', 'periodo', 'separar_por_negocio', 'negocios']):
+                st.session_state.generate_rolling_charts = params
         
         # Recargar la página para mostrar la respuesta
         st.rerun()
