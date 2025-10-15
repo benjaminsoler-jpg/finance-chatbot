@@ -1538,9 +1538,15 @@ class FinancialChatbot:
         # Storytelling completo
         analysis += self._generate_storytelling(elaboracion, periodos, escenario, negocios)
         
-        # Visualizaciones interactivas - Usar Streamlit directamente
+        # Marcar que se deben generar gráficos de últimos meses
         if cambios_significativos:
-            self.generate_visualizations_streamlit(cambios_significativos, elaboracion, periodos, escenario)
+            analysis += "---\n\n"
+            analysis += "## 📊 **VISUALIZACIONES INTERACTIVAS**\n\n"
+            analysis += "**GENERATE_LAST_MONTHS_CHARTS:**\n"
+            analysis += f"elaboracion={elaboracion}\n"
+            analysis += f"periodos={periodos}\n"
+            analysis += f"escenario={escenario}\n"
+            analysis += f"negocios={negocios}\n"
         else:
             analysis += "ℹ️ No hay cambios significativos para visualizar.\n\n"
         
@@ -2240,6 +2246,24 @@ class FinancialChatbot:
         
         return visualizations
     
+    def _get_significant_changes_for_charts(self, elaboracion, periodos, escenario, negocios):
+        """Regenerar cambios significativos para los gráficos"""
+        cambios_significativos = []
+        
+        # Variables de tasa
+        rate_variables = ['Rate All In', 'Risk Rate', 'Fund Rate', 'Term']
+        for variable in rate_variables:
+            cambios = self._get_significant_rate_changes(variable, elaboracion, periodos, escenario, negocios)
+            cambios_significativos.extend(cambios)
+        
+        # Variables monetarias
+        sum_variables = ['Originacion Prom', 'New Active', 'Churn Bruto', 'Resucitados']
+        for variable in sum_variables:
+            cambios = self._get_significant_monetary_changes(variable, elaboracion, periodos, escenario, negocios)
+            cambios_significativos.extend(cambios)
+        
+        return cambios_significativos
+
     def generate_visualizations_streamlit(self, cambios_significativos, elaboracion, periodos, escenario):
         """Generar visualizaciones directamente en Streamlit"""
         if not cambios_significativos:
@@ -3614,6 +3638,26 @@ def main():
                             params['periodo'], 
                             params['negocios']
                         )
+                elif message["content"] == "CHARTS_LAST_MONTHS" and "chart_params" in message:
+                    params = message["chart_params"]
+                    st.markdown("---")
+                    st.markdown("## 📊 **VISUALIZACIONES INTERACTIVAS**")
+                    
+                    # Regenerar cambios significativos para los gráficos
+                    cambios_significativos = chatbot._get_significant_changes_for_charts(
+                        params['elaboracion'],
+                        params['periodos'],
+                        params['escenario'],
+                        params['negocios']
+                    )
+                    
+                    # Generar gráficos de últimos meses
+                    chatbot.generate_visualizations_streamlit(
+                        cambios_significativos,
+                        params['elaboracion'],
+                        params['periodos'],
+                        params['escenario']
+                    )
                 else:
                     # Convertir saltos de línea a <br> para HTML
                     content_html = message["content"].replace('\n', '<br>')
@@ -3630,9 +3674,9 @@ def main():
         with st.spinner("Procesando..."):
             response = chatbot.get_chat_response(user_input)
         
-        # Detectar si se deben generar gráficos rolling
+        # Detectar si se deben generar gráficos
         if "**GENERATE_ROLLING_CHARTS:**" in response:
-            # Extraer parámetros
+            # Extraer parámetros para rolling charts
             lines = response.split('\n')
             params = {}
             for line in lines:
@@ -3660,6 +3704,42 @@ def main():
                 st.session_state.messages.append({
                     "role": "assistant", 
                     "content": "CHARTS_ROLLING",
+                    "chart_params": params
+                })
+            else:
+                st.session_state.messages.append({"role": "assistant", "content": response})
+        elif "**GENERATE_LAST_MONTHS_CHARTS:**" in response:
+            # Extraer parámetros para last months charts
+            lines = response.split('\n')
+            params = {}
+            for line in lines:
+                if '=' in line and not line.startswith('**'):
+                    key, value = line.split('=', 1)
+                    if key in ['periodos', 'negocios']:
+                        # Convertir string de lista a lista real
+                        value = value.strip("[]").replace("'", "").split(', ')
+                        value = [v.strip() for v in value if v.strip()]
+                    elif value.lower() == 'true':
+                        value = True
+                    elif value.lower() == 'false':
+                        value = False
+                    elif value == 'None':
+                        value = None
+                    else:
+                        params[key] = value
+            
+            # Generar gráficos y agregar al mensaje
+            if all(k in params for k in ['elaboracion', 'periodos', 'escenario', 'negocios']):
+                # Limpiar el marcador de la respuesta
+                clean_response = response.split("**GENERATE_LAST_MONTHS_CHARTS:**")[0].strip()
+                
+                # Agregar mensaje limpio
+                st.session_state.messages.append({"role": "assistant", "content": clean_response})
+                
+                # Agregar gráficos como mensaje especial
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": "CHARTS_LAST_MONTHS",
                     "chart_params": params
                 })
             else:
