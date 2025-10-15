@@ -416,10 +416,10 @@ class FinancialChatbot:
         variables_clave = ['Rate All In', 'Originacion Prom', 'Term', 'Risk Rate', 'Fund Rate']
         
         # Variables que son rates (porcentajes) - no se suman, se muestran por clasificación/cohort
-        rate_variables = ['Rate All In', 'Risk Rate', 'Fund Rate']
+        rate_variables = ['Rate All In', 'Risk Rate', 'Fund Rate', 'Term']
         
         # Variables que se suman (valores monetarios)
-        sum_variables = ['Originacion Prom', 'Term']
+        sum_variables = ['Originacion Prom']
         
         # Obtener negocios únicos
         negocios = ['PYME', 'CORP', 'Brokers', 'WK']
@@ -455,7 +455,10 @@ class FinancialChatbot:
                             clasificacion = row['Clasificación'] if pd.notna(row['Clasificación']) else 'Sin clasificación'
                             cohort = row['Cohort_Act'] if pd.notna(row['Cohort_Act']) else 'Sin cohort'
                             valor = row['Valor']
-                            analysis += f"        - {clasificacion} ({cohort}): {valor*100:.2f}%\n"
+                            if variable == 'Term':
+                                analysis += f"        - {clasificacion} ({cohort}): {valor:.0f}\n"
+                            else:
+                                analysis += f"        - {clasificacion} ({cohort}): {valor*100:.2f}%\n"
                     else:
                         analysis += f"      • {periodo}: Sin datos\n"
                 analysis += "\n"
