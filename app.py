@@ -105,8 +105,20 @@ class FinancialChatbot:
             
             # Limpiar datos
             self.df.columns = self.df.columns.str.strip()
-            # Convertir a numérico: quitar comas, convertir a float
+            
+            # Convertir columna Valor a numérico, manejando comas, % y valores nulos
             self.df['Valor'] = self.df['Valor'].astype(str).str.replace(',', '')
+            
+            # Detectar si el valor ya está en formato porcentaje (contiene %)
+            def convert_percentage(value_str):
+                if '%' in str(value_str):
+                    # Si tiene %, convertir de porcentaje a decimal
+                    return float(str(value_str).replace('%', '')) / 100
+                else:
+                    # Si no tiene %, convertir directamente
+                    return float(value_str)
+            
+            self.df['Valor'] = self.df['Valor'].apply(convert_percentage)
             self.df['Valor'] = pd.to_numeric(self.df['Valor'], errors='coerce').fillna(0)
             self.df.dropna(subset=['Valor'], inplace=True)
             
