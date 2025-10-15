@@ -850,24 +850,29 @@ class FinancialChatbot:
         tendencias_negativas = [c for c in cambios_significativos if c['tendencia'] in ['bajó', 'decreció']]
         
         if len(tendencias_positivas) > len(tendencias_negativas):
-            storytelling += "El análisis del período muestra una **tendencia general positiva** en la mayoría de los indicadores clave. Los resultados sugieren un desempeño sólido con mejoras significativas en varios segmentos de negocio.\n\n"
+            storytelling += "El análisis del período muestra una **tendencia general positiva** en la mayoría de los indicadores clave. Los resultados sugieren un **desempeño sólido** con mejoras significativas en varios segmentos de negocio.\n\n"
         elif len(tendencias_negativas) > len(tendencias_positivas):
-            storytelling += "El análisis revela una **tendencia general negativa** con deterioro en varios indicadores críticos. Esta situación requiere atención inmediata y revisión de estrategias operativas.\n\n"
+            storytelling += "El análisis revela una **tendencia general negativa** con deterioro en varios indicadores críticos. Esta situación requiere **atención inmediata** y revisión de estrategias operativas.\n\n"
         else:
-            storytelling += "El período presenta una **tendencia mixta** con comportamiento diverso entre indicadores. Mientras algunos segmentos muestran fortaleza, otros requieren intervención estratégica.\n\n"
+            storytelling += "El período presenta una **tendencia mixta** con comportamiento diverso entre indicadores. Mientras algunos segmentos muestran **fortaleza**, otros requieren **intervención estratégica**.\n\n"
         
-        # Análisis detallado por variable
+        # Análisis detallado por variable - Solo las más importantes
         if cambios_significativos:
             storytelling += "### 📈 **ANÁLISIS DETALLADO POR VARIABLE**\n\n"
             
-            # Agrupar por variable
+            # Agrupar por variable y ordenar por magnitud
             variables_analisis = {}
             for cambio in cambios_significativos:
                 if cambio['variable'] not in variables_analisis:
                     variables_analisis[cambio['variable']] = []
                 variables_analisis[cambio['variable']].append(cambio)
             
-            for variable, cambios_var in variables_analisis.items():
+            # Ordenar variables por la magnitud del cambio más grande
+            variables_ordenadas = sorted(variables_analisis.items(), 
+                                       key=lambda x: max(abs(c['magnitud']) for c in x[1]), 
+                                       reverse=True)
+            
+            for variable, cambios_var in variables_ordenadas[:3]:  # Solo top 3 variables
                 storytelling += f"#### <div class='variable-title'>**{variable}**</div>\n\n"
                 
                 if variable == 'Originacion Prom':
@@ -885,7 +890,7 @@ class FinancialChatbot:
                 
                 storytelling += "\n"
         
-        # Análisis por segmento de negocio
+        # Análisis por segmento de negocio - Solo los que tienen cambios significativos
         storytelling += "### 🏢 **ANÁLISIS POR SEGMENTO DE NEGOCIO**\n\n"
         
         for negocio in negocios:
@@ -1115,33 +1120,64 @@ class FinancialChatbot:
         """Análisis experto por segmento de negocio"""
         analysis = ""
         
+        # Contexto del segmento
         if negocio == 'PYME':
-            analysis += "El segmento **PYME** representa el núcleo del negocio y su desempeño es crítico para la sostenibilidad operativa. "
+            analysis += "El segmento **PYME** representa el **núcleo del negocio** y su desempeño es crítico para la **sostenibilidad operativa**. "
         elif negocio == 'CORP':
-            analysis += "El segmento **CORP** constituye el motor de crecimiento principal y su evolución impacta significativamente en los resultados consolidados. "
+            analysis += "El segmento **CORP** constituye el **motor de crecimiento principal** y su evolución impacta significativamente en los **resultados consolidados**. "
         elif negocio == 'Brokers':
-            analysis += "El segmento **Brokers** actúa como un canal de distribución clave y su rendimiento refleja la eficiencia de las estrategias de canal. "
+            analysis += "El segmento **Brokers** actúa como un **canal de distribución clave** y su rendimiento refleja la eficiencia de las **estrategias de canal**. "
         elif negocio == 'WK':
-            analysis += "El segmento **WK** representa una oportunidad de crecimiento emergente y su desarrollo es fundamental para la diversificación del negocio. "
+            analysis += "El segmento **WK** representa una **oportunidad de crecimiento emergente** y su desarrollo es fundamental para la **diversificación del negocio**. "
         
-        # Analizar el cambio más significativo
+        # Analizar todos los cambios del segmento
         if cambios:
-            cambio_principal = max(cambios, key=lambda x: abs(x['magnitud']))
+            # Separar cambios positivos y negativos
+            cambios_positivos = [c for c in cambios if c['tendencia'] in ['subió', 'creció']]
+            cambios_negativos = [c for c in cambios if c['tendencia'] in ['bajó', 'decreció']]
             
-            if cambio_principal['tendencia'] in ['subió', 'creció']:
-                analysis += f"Los resultados muestran una **tendencia positiva** con mejoras significativas en {cambio_principal['variable']}, lo que sugiere una estrategia exitosa en este segmento.\n\n"
+            if cambios_positivos and not cambios_negativos:
+                analysis += "Los resultados muestran una **tendencia completamente positiva** con mejoras en múltiples indicadores, sugiriendo una **estrategia exitosa** en este segmento.\n\n"
+            elif cambios_negativos and not cambios_positivos:
+                analysis += "Los resultados revelan una **tendencia completamente negativa** con deterioro en múltiples indicadores, indicando la necesidad de **intervención estratégica inmediata**.\n\n"
             else:
-                analysis += f"Los resultados revelan una **tendencia negativa** con deterioro en {cambio_principal['variable']}, lo que indica la necesidad de intervención estratégica inmediata.\n\n"
+                analysis += "Los resultados presentan un **comportamiento mixto** con mejoras en algunos indicadores y deterioro en otros, sugiriendo la necesidad de **estrategias diferenciadas**.\n\n"
+            
+            # Detallar los cambios más importantes
+            cambios_ordenados = sorted(cambios, key=lambda x: abs(x['magnitud']), reverse=True)
+            for i, cambio in enumerate(cambios_ordenados[:2]):  # Solo los 2 más importantes
+                if cambio['tipo'] == 'rate':
+                    if cambio['tendencia'] in ['subió', 'creció']:
+                        analysis += f"• **{cambio['variable']}** registra una **mejora** de {cambio['magnitud']:.2f}pp ({cambio['porcentaje']:.1f}%), indicando **fortaleza** en este indicador.\n\n"
+                    else:
+                        analysis += f"• **{cambio['variable']}** experimenta una **reducción** de {abs(cambio['magnitud']):.2f}pp ({abs(cambio['porcentaje']):.1f}%), requiriendo **atención estratégica**.\n\n"
+                else:
+                    if cambio['tendencia'] in ['subió', 'creció']:
+                        analysis += f"• **{cambio['variable']}** presenta un **crecimiento** de ${cambio['magnitud']:,.0f} ({cambio['porcentaje']:.1f}%), demostrando **fortaleza** en este segmento.\n\n"
+                    else:
+                        analysis += f"• **{cambio['variable']}** registra una **contracción** de ${abs(cambio['magnitud']):,.0f} ({abs(cambio['porcentaje']):.1f}%), sugiriendo **desafíos** en este segmento.\n\n"
             
             # Recomendaciones específicas por negocio
-            if negocio == 'PYME' and cambio_principal['tendencia'] in ['bajó', 'decreció']:
-                analysis += "**Recomendación estratégica:** Dado el carácter crítico del segmento PYME, se recomienda implementar un plan de acción inmediato que incluya revisión de pricing, optimización de procesos y fortalecimiento de la propuesta de valor.\n\n"
-            elif negocio == 'CORP' and cambio_principal['tendencia'] in ['subió', 'creció']:
-                analysis += "**Recomendación estratégica:** El crecimiento en CORP presenta una oportunidad para acelerar la expansión y replicar las mejores prácticas en otros segmentos.\n\n"
-            elif negocio == 'Brokers' and cambio_principal['tendencia'] in ['bajó', 'decreció']:
-                analysis += "**Recomendación estratégica:** El deterioro en Brokers requiere una revisión de la estrategia de canal y la implementación de medidas de apoyo para fortalecer la red de distribución.\n\n"
-            elif negocio == 'WK' and cambio_principal['tendencia'] in ['subió', 'creció']:
-                analysis += "**Recomendación estratégica:** El crecimiento en WK valida la estrategia de diversificación y sugiere oportunidades para expandir la presencia en este segmento emergente.\n\n"
+            if negocio == 'PYME':
+                if cambios_negativos:
+                    analysis += "**Recomendación estratégica:** Dado el carácter crítico del segmento PYME, se recomienda implementar un **plan de acción inmediato** que incluya **revisión de pricing**, **optimización de procesos** y **fortalecimiento de la propuesta de valor**.\n\n"
+                else:
+                    analysis += "**Recomendación estratégica:** El crecimiento en PYME valida la estrategia actual. Se recomienda **capitalizar este momentum** para **acelerar la expansión** y replicar las mejores prácticas en otros segmentos.\n\n"
+            elif negocio == 'CORP':
+                if cambios_negativos:
+                    analysis += "**Recomendación estratégica:** El deterioro en CORP requiere una **revisión urgente** de la estrategia de crecimiento y la implementación de **medidas de apoyo** para fortalecer la **sostenibilidad del segmento**.\n\n"
+                else:
+                    analysis += "**Recomendación estratégica:** El crecimiento en CORP presenta una **oportunidad** para acelerar la expansión y replicar las **mejores prácticas** en otros segmentos.\n\n"
+            elif negocio == 'Brokers':
+                if cambios_negativos:
+                    analysis += "**Recomendación estratégica:** El deterioro en Brokers requiere una **revisión de la estrategia de canal** y la implementación de **medidas de apoyo** para fortalecer la **red de distribución**.\n\n"
+                else:
+                    analysis += "**Recomendación estratégica:** El crecimiento en Brokers valida la estrategia de canal. Se recomienda **expandir la red** y **optimizar los procesos** de distribución.\n\n"
+            elif negocio == 'WK':
+                if cambios_negativos:
+                    analysis += "**Recomendación estratégica:** El deterioro en WK sugiere desafíos en la estrategia de diversificación. Se recomienda **revisar el modelo de negocio** y **ajustar la propuesta de valor**.\n\n"
+                else:
+                    analysis += "**Recomendación estratégica:** El crecimiento en WK valida la **estrategia de diversificación** y sugiere **oportunidades** para expandir la presencia en este **segmento emergente**.\n\n"
         
         return analysis
     
