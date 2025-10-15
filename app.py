@@ -911,31 +911,31 @@ class FinancialChatbot:
         cambios_negativos = [c for c in cambios if c['tendencia'] == 'decreció']
         
         if cambios_negativos and not cambios_positivos:
-            analysis += "La **Originación Promedio** presenta un **deterioro generalizado** en todos los segmentos analizados. Esta caída sistemática en los volúmenes de originación sugiere desafíos estructurales en la capacidad de adquisición de nuevos clientes o en la retención de la cartera existente.\n\n"
+            analysis += "La **Originación Promedio** presenta un **deterioro generalizado** en todos los segmentos analizados. Esta **caída sistemática** en los volúmenes de originación sugiere **desafíos estructurales** en la capacidad de adquisición de nuevos clientes o en la retención de la cartera existente.\n\n"
             
             for cambio in cambios_negativos:
-                analysis += f"El segmento **{cambio['negocio']}** registra la mayor contracción con una reducción de ${abs(cambio['magnitud']):,.0f} ({abs(cambio['porcentaje']):.1f}%), lo que representa un **riesgo significativo** para la sostenibilidad del negocio en este segmento.\n\n"
+                analysis += f"El segmento **{cambio['negocio']}** registra la mayor **contracción** con una reducción de ${abs(cambio['magnitud']):,.0f} ({abs(cambio['porcentaje']):.1f}%), lo que representa un **riesgo significativo** para la **sostenibilidad del negocio** en este segmento.\n\n"
             
-            analysis += "**Implicaciones estratégicas:** Esta tendencia negativa requiere una revisión inmediata de las estrategias de adquisición, pricing y retención. Se recomienda un análisis profundo de la competencia y la propuesta de valor para identificar las causas raíz del deterioro.\n\n"
+            analysis += "**Implicaciones estratégicas:** Esta **tendencia negativa** requiere una **revisión inmediata** de las estrategias de adquisición, pricing y retención. Se recomienda un **análisis profundo** de la competencia y la propuesta de valor para identificar las **causas raíz** del deterioro.\n\n"
             
         elif cambios_positivos and not cambios_negativos:
-            analysis += "La **Originación Promedio** muestra un **crecimiento robusto** en todos los segmentos, indicando una estrategia de adquisición exitosa y una demanda saludable en el mercado.\n\n"
+            analysis += "La **Originación Promedio** muestra un **crecimiento robusto** en todos los segmentos, indicando una **estrategia de adquisición exitosa** y una **demanda saludable** en el mercado.\n\n"
             
             for cambio in cambios_positivos:
-                analysis += f"El segmento **{cambio['negocio']}** destaca con un crecimiento de ${cambio['magnitud']:,.0f} ({cambio['porcentaje']:.1f}%), demostrando una **excelente penetración** en este nicho de mercado.\n\n"
+                analysis += f"El segmento **{cambio['negocio']}** destaca con un **crecimiento** de ${cambio['magnitud']:,.0f} ({cambio['porcentaje']:.1f}%), demostrando una **excelente penetración** en este nicho de mercado.\n\n"
             
-            analysis += "**Implicaciones estratégicas:** Este crecimiento sostenido valida la estrategia actual y sugiere oportunidades para expandir la presencia en segmentos de alto rendimiento. Se recomienda capitalizar este momentum para acelerar el crecimiento.\n\n"
+            analysis += "**Implicaciones estratégicas:** Este **crecimiento sostenido** valida la estrategia actual y sugiere **oportunidades** para expandir la presencia en segmentos de **alto rendimiento**. Se recomienda **capitalizar este momentum** para acelerar el crecimiento.\n\n"
             
         else:
-            analysis += "La **Originación Promedio** presenta un **comportamiento mixto** entre segmentos, con algunos mostrando crecimiento mientras otros experimentan contracción.\n\n"
+            analysis += "La **Originación Promedio** presenta un **comportamiento mixto** entre segmentos, con algunos mostrando **crecimiento** mientras otros experimentan **contracción**.\n\n"
             
             for cambio in cambios:
                 if cambio['tendencia'] == 'creció':
-                    analysis += f"**{cambio['negocio']}** registra un crecimiento positivo de ${cambio['magnitud']:,.0f} ({cambio['porcentaje']:.1f}%), indicando fortaleza en este segmento.\n\n"
+                    analysis += f"**{cambio['negocio']}** registra un **crecimiento positivo** de ${cambio['magnitud']:,.0f} ({cambio['porcentaje']:.1f}%), indicando **fortaleza** en este segmento.\n\n"
                 else:
-                    analysis += f"**{cambio['negocio']}** experimenta una contracción de ${abs(cambio['magnitud']):,.0f} ({abs(cambio['porcentaje']):.1f}%), requiriendo atención estratégica.\n\n"
+                    analysis += f"**{cambio['negocio']}** experimenta una **contracción** de ${abs(cambio['magnitud']):,.0f} ({abs(cambio['porcentaje']):.1f}%), requiriendo **atención estratégica**.\n\n"
             
-            analysis += "**Implicaciones estratégicas:** Esta divergencia entre segmentos sugiere la necesidad de estrategias diferenciadas. Los segmentos en crecimiento deben recibir mayor inversión, mientras que los en contracción requieren intervención inmediata.\n\n"
+            analysis += "**Implicaciones estratégicas:** Esta **divergencia** entre segmentos sugiere la necesidad de **estrategias diferenciadas**. Los segmentos en **crecimiento** deben recibir **mayor inversión**, mientras que los en **contracción** requieren **intervención inmediata**.\n\n"
         
         return analysis
     
@@ -947,20 +947,20 @@ class FinancialChatbot:
         cambios_negativos = [c for c in cambios if c['tendencia'] == 'bajó']
         
         if cambios_positivos and not cambios_negativos:
-            analysis += "El **Rate All In** presenta una **tendencia alcista generalizada**, lo que indica una mejora en la rentabilidad por producto y una mayor eficiencia en la estructura de costos.\n\n"
+            analysis += "El **Rate All In** presenta una **tendencia alcista generalizada**, lo que indica una **mejora en la rentabilidad** por producto y una **mayor eficiencia** en la estructura de costos.\n\n"
             
             for cambio in cambios_positivos:
-                analysis += f"El segmento **{cambio['negocio']}** muestra la mayor mejora con un incremento de {cambio['magnitud']:.2f} puntos porcentuales ({cambio['porcentaje']:.1f}%), reflejando una **optimización exitosa** de la propuesta de valor.\n\n"
+                analysis += f"El segmento **{cambio['negocio']}** muestra la mayor **mejora** con un incremento de {cambio['magnitud']:.2f} puntos porcentuales ({cambio['porcentaje']:.1f}%), reflejando una **optimización exitosa** de la propuesta de valor.\n\n"
             
-            analysis += "**Implicaciones estratégicas:** Esta mejora en rentabilidad valida las estrategias de pricing y optimización de costos. Se recomienda mantener esta tendencia mientras se evalúan oportunidades de crecimiento adicional.\n\n"
+            analysis += "**Implicaciones estratégicas:** Esta **mejora en rentabilidad** valida las estrategias de **pricing** y **optimización de costos**. Se recomienda **mantener esta tendencia** mientras se evalúan **oportunidades de crecimiento** adicional.\n\n"
             
         elif cambios_negativos and not cambios_positivos:
-            analysis += "El **Rate All In** experimenta una **presión a la baja** en todos los segmentos, lo que sugiere desafíos en la sostenibilidad de la rentabilidad y posible erosión de márgenes.\n\n"
+            analysis += "El **Rate All In** experimenta una **presión a la baja** en todos los segmentos, lo que sugiere **desafíos en la sostenibilidad** de la rentabilidad y posible **erosión de márgenes**.\n\n"
             
             for cambio in cambios_negativos:
-                analysis += f"El segmento **{cambio['negocio']}** registra la mayor contracción con una reducción de {abs(cambio['magnitud']):.2f} puntos porcentuales ({abs(cambio['porcentaje']):.1f}%), indicando **presión competitiva** significativa.\n\n"
+                analysis += f"El segmento **{cambio['negocio']}** registra la mayor **contracción** con una reducción de {abs(cambio['magnitud']):.2f} puntos porcentuales ({abs(cambio['porcentaje']):.1f}%), indicando **presión competitiva** significativa.\n\n"
             
-            analysis += "**Implicaciones estratégicas:** Esta tendencia negativa requiere una revisión urgente de la estrategia de pricing y la estructura de costos. Se recomienda un análisis competitivo profundo y la implementación de medidas de optimización.\n\n"
+            analysis += "**Implicaciones estratégicas:** Esta **tendencia negativa** requiere una **revisión urgente** de la estrategia de **pricing** y la estructura de costos. Se recomienda un **análisis competitivo profundo** y la implementación de **medidas de optimización**.\n\n"
             
         else:
             analysis += "El **Rate All In** presenta un **comportamiento divergente** entre segmentos, con algunos mostrando mejoras mientras otros experimentan deterioro.\n\n"
@@ -1161,29 +1161,29 @@ class FinancialChatbot:
         
         # Recomendaciones basadas en patrones
         if 'Originacion Prom' in variables_negativas:
-            recommendations += "**1. Estrategia de Adquisición:** La contracción en Originación Promedio requiere una revisión integral de las estrategias de adquisición. Se recomienda implementar campañas de marketing dirigidas, optimizar los procesos de onboarding y fortalecer la propuesta de valor diferenciada.\n\n"
+            recommendations += "**1. Estrategia de Adquisición:** La **contracción** en Originación Promedio requiere una **revisión integral** de las estrategias de adquisición. Se recomienda implementar **campañas de marketing dirigidas**, **optimizar los procesos** de onboarding y **fortalecer la propuesta de valor** diferenciada.\n\n"
         
         if 'Rate All In' in variables_negativas:
-            recommendations += "**2. Optimización de Rentabilidad:** El deterioro en Rate All In sugiere presiones en la rentabilidad. Se recomienda revisar la estructura de costos, optimizar los procesos operativos y evaluar ajustes en la estrategia de pricing.\n\n"
+            recommendations += "**2. Optimización de Rentabilidad:** El **deterioro** en Rate All In sugiere **presiones en la rentabilidad**. Se recomienda **revisar la estructura de costos**, **optimizar los procesos operativos** y evaluar **ajustes en la estrategia de pricing**.\n\n"
         
         if 'Term' in variables_negativas:
-            recommendations += "**3. Retención de Clientes:** La reducción en Term indica desafíos en la retención. Se recomienda implementar programas de fidelización, mejorar la experiencia del cliente y desarrollar estrategias de upselling y cross-selling.\n\n"
+            recommendations += "**3. Retención de Clientes:** La **reducción** en Term indica **desafíos en la retención**. Se recomienda implementar **programas de fidelización**, **mejorar la experiencia del cliente** y desarrollar estrategias de **upselling y cross-selling**.\n\n"
         
         if 'Risk Rate' in variables_positivas:
-            recommendations += "**4. Gestión de Riesgo:** La mejora en Risk Rate valida las estrategias de evaluación crediticia. Se recomienda mantener esta tendencia mientras se evalúan oportunidades de crecimiento con mayor apetito de riesgo controlado.\n\n"
+            recommendations += "**4. Gestión de Riesgo:** La **mejora** en Risk Rate valida las estrategias de **evaluación crediticia**. Se recomienda **mantener esta tendencia** mientras se evalúan **oportunidades de crecimiento** con mayor **apetito de riesgo controlado**.\n\n"
         
         if 'Fund Rate' in variables_positivas:
-            recommendations += "**5. Optimización de Fondeo:** La mejora en Fund Rate indica una gestión eficiente del financiamiento. Se recomienda capitalizar esta ventaja competitiva para impulsar el crecimiento sostenible.\n\n"
+            recommendations += "**5. Optimización de Fondeo:** La **mejora** en Fund Rate indica una **gestión eficiente** del financiamiento. Se recomienda **capitalizar esta ventaja competitiva** para impulsar el **crecimiento sostenible**.\n\n"
         
         # Recomendaciones generales
         if len(variables_negativas) > len(variables_positivas):
-            recommendations += "**6. Plan de Recuperación:** Dado el predominio de tendencias negativas, se recomienda implementar un plan de recuperación integral que incluya revisión de estrategias, optimización de procesos y fortalecimiento de capacidades operativas.\n\n"
+            recommendations += "**6. Plan de Recuperación:** Dado el **predominio de tendencias negativas**, se recomienda implementar un **plan de recuperación integral** que incluya **revisión de estrategias**, **optimización de procesos** y **fortalecimiento de capacidades operativas**.\n\n"
         elif len(variables_positivas) > len(variables_negativas):
-            recommendations += "**6. Aceleración del Crecimiento:** El predominio de tendencias positivas presenta una oportunidad para acelerar el crecimiento. Se recomienda capitalizar este momentum para expandir la presencia en segmentos de alto rendimiento.\n\n"
+            recommendations += "**6. Aceleración del Crecimiento:** El **predominio de tendencias positivas** presenta una **oportunidad** para acelerar el crecimiento. Se recomienda **capitalizar este momentum** para expandir la presencia en segmentos de **alto rendimiento**.\n\n"
         else:
-            recommendations += "**6. Estrategia Diferenciada:** La naturaleza mixta de los resultados sugiere la necesidad de estrategias diferenciadas por segmento. Se recomienda desarrollar planes de acción específicos para cada área de negocio.\n\n"
+            recommendations += "**6. Estrategia Diferenciada:** La **naturaleza mixta** de los resultados sugiere la necesidad de **estrategias diferenciadas** por segmento. Se recomienda desarrollar **planes de acción específicos** para cada área de negocio.\n\n"
         
-        recommendations += "**7. Monitoreo Continuo:** Se recomienda implementar un sistema de monitoreo en tiempo real para detectar cambios tempranos en los indicadores clave y permitir una respuesta ágil a las condiciones del mercado.\n\n"
+        recommendations += "**7. Monitoreo Continuo:** Se recomienda implementar un **sistema de monitoreo en tiempo real** para detectar **cambios tempranos** en los indicadores clave y permitir una **respuesta ágil** a las condiciones del mercado.\n\n"
         
         return recommendations
     
