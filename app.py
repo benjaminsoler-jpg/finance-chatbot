@@ -902,8 +902,8 @@ class FinancialChatbot:
         for negocio in negocios:
             # Solo comparar el último período con el primero (tendencia general)
             if len(periodos) >= 2:
-                periodo_actual = periodos[-1]  # Último período
-                periodo_anterior = periodos[0]  # Primer período
+                periodo_actual = periodos[0]  # Primer período (más reciente)
+                periodo_anterior = periodos[-1]  # Último período (más antiguo)
                 
                 # Obtener valores
                 valor_actual = self._get_rate_value(variable, elaboracion, periodo_actual, escenario, negocio)
@@ -935,8 +935,8 @@ class FinancialChatbot:
         for negocio in negocios:
             # Solo comparar el último período con el primero (tendencia general)
             if len(periodos) >= 2:
-                periodo_actual = periodos[-1]  # Último período
-                periodo_anterior = periodos[0]  # Primer período
+                periodo_actual = periodos[0]  # Primer período (más reciente)
+                periodo_anterior = periodos[-1]  # Último período (más antiguo)
                 
                 # Obtener valores
                 valor_actual = self._get_monetary_value(variable, elaboracion, periodo_actual, escenario, negocio)
