@@ -518,6 +518,22 @@ class FinancialChatbot:
             
             analysis += "---\n\n"
         
+        # Análisis automático de variables
+        analysis += "📊 **Análisis Automático de Variables:**\n\n"
+        
+        # Analizar cada variable para todos los negocios
+        for variable in variables_clave:
+            analysis += f"🔍 **{variable}:**\n"
+            
+            if variable in rate_variables:
+                # Análisis para rates
+                analysis += self._analyze_rate_variable(variable, elaboracion, periodos, escenario, negocios)
+            else:
+                # Análisis para variables monetarias
+                analysis += self._analyze_monetary_variable(variable, elaboracion, periodos, escenario, negocios)
+            
+            analysis += "\n"
+        
         # Si se menciona "Resultado Comercial", agregar análisis por negocio
         if 'resultado comercial' in query.lower():
             analysis += "🏢 **Análisis por Negocio - Resultado Comercial:**\n"
@@ -548,6 +564,145 @@ class FinancialChatbot:
                         analysis += f"  - {periodo}: ${valor:,}\n"
                     else:
                         analysis += f"  - {periodo}: Sin datos\n"
+        
+        return analysis
+    
+    def _analyze_rate_variable(self, variable, elaboracion, periodos, escenario, negocios):
+        """Análisis automático para variables de rate (porcentajes)"""
+        analysis = ""
+        
+        # Obtener datos para todos los negocios
+        all_data = []
+        for negocio in negocios:
+            for periodo in periodos:
+                filtro = (
+                    (self.df['Elaboracion'] == elaboracion) & 
+                    (self.df['Periodo'] == periodo) & 
+                    (self.df['Concepto'] == variable) &
+                    (self.df['Negocio'] == negocio)
+                )
+                
+                if escenario:
+                    filtro = filtro & (self.df['Escenario'] == escenario)
+                
+                data = self.df[filtro]
+                if len(data) > 0:
+                    grouped = data.groupby(['Clasificación', 'Cohort_Act'])['Valor'].first().reset_index()
+                    for _, row in grouped.iterrows():
+                        clasificacion = row['Clasificación'] if pd.notna(row['Clasificación']) else 'Sin clasificación'
+                        cohort = row['Cohort_Act'] if pd.notna(row['Cohort_Act']) else 'Sin cohort'
+                        valor = row['Valor']
+                        all_data.append({
+                            'negocio': negocio,
+                            'periodo': periodo,
+                            'clasificacion': clasificacion,
+                            'cohort': cohort,
+                            'valor': valor
+                        })
+        
+        if not all_data:
+            return "  ℹ️ No hay datos disponibles para este período.\n"
+        
+        # Convertir a DataFrame para análisis
+        df_analysis = pd.DataFrame(all_data)
+        
+        # Análisis por negocio
+        negocio_stats = df_analysis.groupby('negocio')['valor'].agg(['mean', 'min', 'max', 'std']).round(2)
+        
+        analysis += "  📈 **Por Negocio:**\n"
+        for negocio in negocio_stats.index:
+            stats = negocio_stats.loc[negocio]
+            analysis += f"    • {negocio}: Promedio {stats['mean']:.2f}% (Rango: {stats['min']:.2f}% - {stats['max']:.2f}%)\n"
+        
+        # Análisis por cohort
+        cohort_stats = df_analysis.groupby('cohort')['valor'].agg(['mean', 'count']).round(2)
+        analysis += "  📊 **Por Cohort:**\n"
+        for cohort in cohort_stats.index:
+            stats = cohort_stats.loc[cohort]
+            analysis += f"    • {cohort}: Promedio {stats['mean']:.2f}% ({stats['count']} registros)\n"
+        
+        # Análisis de tendencia temporal
+        periodo_stats = df_analysis.groupby('periodo')['valor'].mean().round(2)
+        if len(periodo_stats) > 1:
+            primer_valor = periodo_stats.iloc[0]
+            ultimo_valor = periodo_stats.iloc[-1]
+            cambio = ultimo_valor - primer_valor
+            if cambio > 0:
+                tendencia = "📈 Creciendo"
+            elif cambio < 0:
+                tendencia = "📉 Decreciendo"
+            else:
+                tendencia = "➡️ Estable"
+            analysis += f"  📅 **Tendencia Temporal:** {tendencia} ({cambio:+.2f} puntos porcentuales)\n"
+        
+        return analysis
+    
+    def _analyze_monetary_variable(self, variable, elaboracion, periodos, escenario, negocios):
+        """Análisis automático para variables monetarias"""
+        analysis = ""
+        
+        # Obtener datos para todos los negocios
+        all_data = []
+        for negocio in negocios:
+            for periodo in periodos:
+                filtro = (
+                    (self.df['Elaboracion'] == elaboracion) & 
+                    (self.df['Periodo'] == periodo) & 
+                    (self.df['Concepto'] == variable) &
+                    (self.df['Negocio'] == negocio)
+                )
+                
+                if escenario:
+                    filtro = filtro & (self.df['Escenario'] == escenario)
+                
+                data = self.df[filtro]
+                if len(data) > 0:
+                    valor = data['Valor'].sum()
+                    all_data.append({
+                        'negocio': negocio,
+                        'periodo': periodo,
+                        'valor': valor
+                    })
+        
+        if not all_data:
+            return "  ℹ️ No hay datos disponibles para este período.\n"
+        
+        # Convertir a DataFrame para análisis
+        df_analysis = pd.DataFrame(all_data)
+        
+        # Análisis por negocio
+        negocio_stats = df_analysis.groupby('negocio')['valor'].agg(['sum', 'mean']).round(0)
+        total_general = negocio_stats['sum'].sum()
+        
+        analysis += "  💰 **Por Negocio:**\n"
+        for negocio in negocio_stats.index:
+            stats = negocio_stats.loc[negocio]
+            porcentaje = (stats['sum'] / total_general * 100) if total_general > 0 else 0
+            analysis += f"    • {negocio}: ${stats['sum']:,.0f} ({porcentaje:.1f}% del total)\n"
+        
+        # Análisis de tendencia temporal
+        periodo_stats = df_analysis.groupby('periodo')['valor'].sum().round(0)
+        if len(periodo_stats) > 1:
+            primer_valor = periodo_stats.iloc[0]
+            ultimo_valor = periodo_stats.iloc[-1]
+            cambio = ultimo_valor - primer_valor
+            porcentaje = (cambio / primer_valor * 100) if primer_valor != 0 else 0
+            if cambio > 0:
+                tendencia = "📈 Creciendo"
+            elif cambio < 0:
+                tendencia = "📉 Decreciendo"
+            else:
+                tendencia = "➡️ Estable"
+            analysis += f"  📅 **Tendencia Temporal:** {tendencia} ({cambio:+,.0f} / {porcentaje:+.1f}%)\n"
+        
+        # Análisis de concentración
+        if variable == 'Originacion Prom':
+            analysis += "  🎯 **Concentración:** "
+            if negocio_stats['sum'].max() / total_general > 0.5:
+                negocio_dominante = negocio_stats['sum'].idxmax()
+                analysis += f"{negocio_dominante} domina el mercado ({negocio_stats.loc[negocio_dominante, 'sum']/total_general*100:.1f}%)\n"
+            else:
+                analysis += "Mercado diversificado entre negocios\n"
         
         return analysis
     
