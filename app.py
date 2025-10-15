@@ -2265,28 +2265,287 @@ class FinancialChatbot:
         return cambios_significativos
 
     def generate_visualizations_streamlit(self, cambios_significativos, elaboracion, periodos, escenario):
-        """Generar visualizaciones directamente en Streamlit"""
+        """Generar visualizaciones específicas para análisis de últimos meses"""
         if not cambios_significativos:
             st.info("ℹ️ No hay cambios significativos para visualizar.")
             return
         
         st.markdown("📊 **VISUALIZACIONES INTERACTIVAS:**")
         
-        # 1. Gráfico de barras - Top cambios por magnitud
-        st.markdown("**Gráfico 1: Top Cambios por Magnitud**")
-        self._create_top_changes_chart_streamlit(cambios_significativos)
+        # 1. Gráfico de tendencias temporales por variable
+        st.markdown("**Gráfico 1: Tendencias Temporales por Variable**")
+        self._create_temporal_trends_chart_streamlit(elaboracion, periodos, escenario)
         
-        # 2. Gráfico de líneas - Tendencias temporales
-        st.markdown("**Gráfico 2: Tendencias Temporales**")
-        self._create_trends_chart_streamlit(cambios_significativos, elaboracion, periodos, escenario)
+        # 2. Gráfico de comparación entre períodos
+        st.markdown("**Gráfico 2: Comparación Período Inicial vs Final**")
+        self._create_period_comparison_chart_streamlit(elaboracion, periodos, escenario)
         
-        # 3. Gráfico de torta - Distribución por segmento
-        st.markdown("**Gráfico 3: Distribución por Segmento**")
-        self._create_segment_distribution_chart_streamlit(cambios_significativos)
+        # 3. Gráfico de evolución por negocio
+        st.markdown("**Gráfico 3: Evolución por Segmento de Negocio**")
+        self._create_business_evolution_chart_streamlit(elaboracion, periodos, escenario)
         
-        # 4. Heatmap - Cambios por variable y negocio
-        st.markdown("**Gráfico 4: Heatmap de Cambios**")
-        self._create_heatmap_chart_streamlit(cambios_significativos)
+        # 4. Heatmap de cambios significativos
+        st.markdown("**Gráfico 4: Heatmap de Cambios Significativos**")
+        self._create_significant_changes_heatmap_streamlit(cambios_significativos)
+    
+    def _create_temporal_trends_chart_streamlit(self, elaboracion, periodos, escenario):
+        """Crear gráfico de tendencias temporales por variable"""
+        import plotly.graph_objects as go
+        from plotly.subplots import make_subplots
+        
+        # Obtener datos para cada variable clave
+        variables = ['Rate All In', 'Originacion Prom', 'Term', 'Risk Rate']
+        negocios = ['PYME', 'CORP', 'Brokers', 'WK']
+        
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=variables,
+            specs=[[{"secondary_y": False}, {"secondary_y": False}],
+                   [{"secondary_y": False}, {"secondary_y": False}]]
+        )
+        
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
+        
+        for i, variable in enumerate(variables):
+            row = (i // 2) + 1
+            col = (i % 2) + 1
+            
+            for j, negocio in enumerate(negocios):
+                # Obtener datos para esta variable y negocio
+                data = self.df[
+                    (self.df['Elaboracion'] == elaboracion) &
+                    (self.df['Escenario'] == escenario) &
+                    (self.df['Negocio'] == negocio) &
+                    (self.df['Concepto'] == variable) &
+                    (self.df['Periodo'].isin(periodos))
+                ].copy()
+                
+                if not data.empty:
+                    # Agrupar por período y obtener el valor promedio
+                    period_data = data.groupby('Periodo')['Valor'].mean().reset_index()
+                    period_data = period_data.sort_values('Periodo')
+                    
+                    # Formatear valores según el tipo de variable
+                    if variable in ['Rate All In', 'Risk Rate', 'Fund Rate']:
+                        y_values = period_data['Valor'] * 100  # Convertir a porcentaje
+                        y_title = "Valor (%)"
+                    elif variable == 'Term':
+                        y_values = period_data['Valor']
+                        y_title = "Valor (días)"
+                    else:  # Originacion Prom
+                        y_values = period_data['Valor'] / 1000000  # Convertir a millones
+                        y_title = "Valor (M$)"
+                    
+                    fig.add_trace(
+                        go.Scatter(
+                            x=period_data['Periodo'],
+                            y=y_values,
+                            mode='lines+markers',
+                            name=f"{variable} - {negocio}",
+                            line=dict(color=colors[j % len(colors)], width=2),
+                            marker=dict(size=8)
+                        ),
+                        row=row, col=col
+                    )
+            
+            # Configurar ejes
+            fig.update_xaxes(title_text="Período", row=row, col=col)
+            fig.update_yaxes(title_text=y_title, row=row, col=col)
+        
+        fig.update_layout(
+            height=600,
+            title_text="📈 Tendencias Temporales por Variable (Últimos 3 Meses)",
+            showlegend=True
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+    
+    def _create_period_comparison_chart_streamlit(self, elaboracion, periodos, escenario):
+        """Crear gráfico de comparación entre período inicial y final"""
+        import plotly.graph_objects as go
+        
+        if len(periodos) < 2:
+            st.info("Se necesitan al menos 2 períodos para la comparación.")
+            return
+        
+        periodo_inicial = periodos[-1]  # El más antiguo
+        periodo_final = periodos[0]     # El más reciente
+        
+        variables = ['Rate All In', 'Originacion Prom', 'Term', 'Risk Rate', 'Fund Rate']
+        negocios = ['PYME', 'CORP', 'Brokers', 'WK']
+        
+        fig = go.Figure()
+        
+        for negocio in negocios:
+            valores_inicial = []
+            valores_final = []
+            labels = []
+            
+            for variable in variables:
+                # Obtener datos del período inicial
+                data_inicial = self.df[
+                    (self.df['Elaboracion'] == elaboracion) &
+                    (self.df['Escenario'] == escenario) &
+                    (self.df['Negocio'] == negocio) &
+                    (self.df['Concepto'] == variable) &
+                    (self.df['Periodo'] == periodo_inicial)
+                ]['Valor'].mean()
+                
+                # Obtener datos del período final
+                data_final = self.df[
+                    (self.df['Elaboracion'] == elaboracion) &
+                    (self.df['Escenario'] == escenario) &
+                    (self.df['Negocio'] == negocio) &
+                    (self.df['Concepto'] == variable) &
+                    (self.df['Periodo'] == periodo_final)
+                ]['Valor'].mean()
+                
+                if not pd.isna(data_inicial) and not pd.isna(data_final):
+                    # Formatear valores según el tipo
+                    if variable in ['Rate All In', 'Risk Rate', 'Fund Rate']:
+                        valor_inicial = data_inicial * 100
+                        valor_final = data_final * 100
+                    elif variable == 'Term':
+                        valor_inicial = data_inicial
+                        valor_final = data_final
+                    else:  # Originacion Prom
+                        valor_inicial = data_inicial / 1000000
+                        valor_final = data_final / 1000000
+                    
+                    valores_inicial.append(valor_inicial)
+                    valores_final.append(valor_final)
+                    labels.append(variable)
+            
+            if valores_inicial and valores_final:
+                fig.add_trace(go.Bar(
+                    name=f"{negocio} - {periodo_inicial}",
+                    x=labels,
+                    y=valores_inicial,
+                    marker_color='lightblue',
+                    opacity=0.7
+                ))
+                
+                fig.add_trace(go.Bar(
+                    name=f"{negocio} - {periodo_final}",
+                    x=labels,
+                    y=valores_final,
+                    marker_color='darkblue',
+                    opacity=0.9
+                ))
+        
+        fig.update_layout(
+            title=f"📊 Comparación {periodo_inicial} vs {periodo_final}",
+            xaxis_title="Variables",
+            yaxis_title="Valor",
+            barmode='group',
+            height=500
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+    
+    def _create_business_evolution_chart_streamlit(self, elaboracion, periodos, escenario):
+        """Crear gráfico de evolución por segmento de negocio"""
+        import plotly.graph_objects as go
+        from plotly.subplots import make_subplots
+        
+        negocios = ['PYME', 'CORP', 'Brokers', 'WK']
+        variables = ['Originacion Prom', 'Rate All In']
+        
+        fig = make_subplots(
+            rows=1, cols=2,
+            subplot_titles=['Originacion Prom (M$)', 'Rate All In (%)'],
+            specs=[[{"secondary_y": False}, {"secondary_y": False}]]
+        )
+        
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
+        
+        for i, variable in enumerate(variables):
+            for j, negocio in enumerate(negocios):
+                # Obtener datos para esta variable y negocio
+                data = self.df[
+                    (self.df['Elaboracion'] == elaboracion) &
+                    (self.df['Escenario'] == escenario) &
+                    (self.df['Negocio'] == negocio) &
+                    (self.df['Concepto'] == variable) &
+                    (self.df['Periodo'].isin(periodos))
+                ].copy()
+                
+                if not data.empty:
+                    # Agrupar por período y obtener el valor promedio
+                    period_data = data.groupby('Periodo')['Valor'].mean().reset_index()
+                    period_data = period_data.sort_values('Periodo')
+                    
+                    # Formatear valores
+                    if variable == 'Rate All In':
+                        y_values = period_data['Valor'] * 100
+                    else:  # Originacion Prom
+                        y_values = period_data['Valor'] / 1000000
+                    
+                    fig.add_trace(
+                        go.Scatter(
+                            x=period_data['Periodo'],
+                            y=y_values,
+                            mode='lines+markers',
+                            name=f"{negocio}",
+                            line=dict(color=colors[j], width=3),
+                            marker=dict(size=10)
+                        ),
+                        row=1, col=i+1
+                    )
+        
+        fig.update_layout(
+            height=400,
+            title_text="🏢 Evolución por Segmento de Negocio (Últimos 3 Meses)",
+            showlegend=True
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+    
+    def _create_significant_changes_heatmap_streamlit(self, cambios_significativos):
+        """Crear heatmap de cambios significativos"""
+        import plotly.graph_objects as go
+        
+        if not cambios_significativos:
+            st.info("No hay cambios significativos para mostrar en el heatmap.")
+            return
+        
+        # Preparar datos para el heatmap
+        variables = list(set([c['variable'] for c in cambios_significativos]))
+        negocios = list(set([c['negocio'] for c in cambios_significativos]))
+        
+        # Crear matriz de cambios
+        matrix = []
+        for variable in variables:
+            row = []
+            for negocio in negocios:
+                # Buscar el cambio para esta combinación
+                cambio = next((c for c in cambios_significativos 
+                             if c['variable'] == variable and c['negocio'] == negocio), None)
+                if cambio:
+                    row.append(cambio['magnitud'])
+                else:
+                    row.append(0)
+            matrix.append(row)
+        
+        fig = go.Figure(data=go.Heatmap(
+            z=matrix,
+            x=negocios,
+            y=variables,
+            colorscale='RdBu',
+            hoverongaps=False,
+            text=[[f"{val:.2f}" for val in row] for row in matrix],
+            texttemplate="%{text}",
+            textfont={"size": 12}
+        ))
+        
+        fig.update_layout(
+            title="🔥 Heatmap de Cambios Significativos",
+            xaxis_title="Negocio",
+            yaxis_title="Variable",
+            height=400
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
     
     def _create_top_changes_chart(self, cambios_significativos):
         """Crear gráfico de barras con los cambios más importantes"""
