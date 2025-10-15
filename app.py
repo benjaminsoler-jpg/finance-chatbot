@@ -442,49 +442,101 @@ class FinancialChatbot:
         # Comparar por Concepto
         analysis += "📋 **Comparación por Concepto:**\n"
         for concepto in variables_comparacion['concepto']:
-            # Datos de predicción (rolling predictivo)
-            pred_data = self.df[
-                (self.df['Elaboracion'] == elaboracion_prediccion) & 
-                (self.df['Periodo'] == periodo) & 
-                (self.df['Concepto'] == concepto)
-            ]
-            
-            # Datos de realidad (históricos)
-            real_data = self.df[
-                (self.df['Elaboracion'] == elaboracion_realidad) & 
-                (self.df['Periodo'] == periodo) & 
-                (self.df['Concepto'] == concepto)
-            ]
-            
-            if len(pred_data) > 0 and len(real_data) > 0:
-                pred_valor = pred_data['Valor'].sum()
-                real_valor = real_data['Valor'].sum()
+            if concepto in ['Rate All In', 'Risk Rate', 'Fund Rate', 'Term']:
+                # Para rates y term: comparar por cohorts
+                analysis += f"📈 **{concepto}:**\n"
                 
-                diferencia = real_valor - pred_valor
-                porcentaje = (diferencia / pred_valor * 100) if pred_valor != 0 else 0
+                # Obtener datos de predicción por cohort
+                pred_data = self.df[
+                    (self.df['Elaboracion'] == elaboracion_prediccion) & 
+                    (self.df['Periodo'] == periodo) & 
+                    (self.df['Concepto'] == concepto)
+                ]
                 
-                if diferencia > 0:
-                    tendencia = "mejor"
-                    emoji = "📈"
-                elif diferencia < 0:
-                    tendencia = "peor"
-                    emoji = "📉"
+                # Obtener datos de realidad por cohort
+                real_data = self.df[
+                    (self.df['Elaboracion'] == elaboracion_realidad) & 
+                    (self.df['Periodo'] == periodo) & 
+                    (self.df['Concepto'] == concepto)
+                ]
+                
+                if len(pred_data) > 0 and len(real_data) > 0:
+                    # Agrupar por cohort y tomar el primer valor único
+                    pred_grouped = pred_data.groupby('Cohort_Act')['Valor'].first()
+                    real_grouped = real_data.groupby('Cohort_Act')['Valor'].first()
+                    
+                    # Obtener cohorts comunes
+                    cohorts_comunes = set(pred_grouped.index) & set(real_grouped.index)
+                    
+                    if cohorts_comunes:
+                        for cohort in sorted(cohorts_comunes):
+                            pred_valor = pred_grouped[cohort]
+                            real_valor = real_grouped[cohort]
+                            
+                            diferencia = real_valor - pred_valor
+                            
+                            if diferencia > 0:
+                                tendencia = "mejor"
+                                emoji = "📈"
+                            elif diferencia < 0:
+                                tendencia = "peor"
+                                emoji = "📉"
+                            else:
+                                tendencia = "igual"
+                                emoji = "➡️"
+                            
+                            if concepto == 'Term':
+                                analysis += f"    {emoji} **{cohort}:**\n"
+                                analysis += f"      - Rolling Predictivo: {pred_valor:.0f}\n"
+                                analysis += f"      - Datos Históricos: {real_valor:.0f}\n"
+                                analysis += f"      - Diferencia: {diferencia:+.0f} - {tendencia}\n"
+                            else:  # Rates
+                                analysis += f"    {emoji} **{cohort}:**\n"
+                                analysis += f"      - Rolling Predictivo: {pred_valor*100:.2f}%\n"
+                                analysis += f"      - Datos Históricos: {real_valor*100:.2f}%\n"
+                                analysis += f"      - Diferencia: {diferencia*100:+.2f}pp - {tendencia}\n"
+                        analysis += "\n"
+                    else:
+                        analysis += f"    - No hay cohorts comunes para comparar\n\n"
                 else:
-                    tendencia = "igual"
-                    emoji = "➡️"
+                    analysis += f"    - No hay datos disponibles para comparar\n\n"
+            else:
+                # Para variables monetarias: sumar y comparar
+                pred_data = self.df[
+                    (self.df['Elaboracion'] == elaboracion_prediccion) & 
+                    (self.df['Periodo'] == periodo) & 
+                    (self.df['Concepto'] == concepto)
+                ]
                 
-                if concepto in ['Rate All In', 'Risk Rate', 'Fund Rate', 'Term']:
-                    analysis += f"  {emoji} **{concepto}:**\n"
-                    analysis += f"    - Rolling Predictivo: {pred_valor:.3f}\n"
-                    analysis += f"    - Datos Históricos: {real_valor:.3f}\n"
-                    analysis += f"    - Diferencia: {diferencia:+.3f} ({porcentaje:+.1f}%) - {tendencia}\n\n"
-                else:
+                real_data = self.df[
+                    (self.df['Elaboracion'] == elaboracion_realidad) & 
+                    (self.df['Periodo'] == periodo) & 
+                    (self.df['Concepto'] == concepto)
+                ]
+                
+                if len(pred_data) > 0 and len(real_data) > 0:
+                    pred_valor = pred_data['Valor'].sum()
+                    real_valor = real_data['Valor'].sum()
+                    
+                    diferencia = real_valor - pred_valor
+                    porcentaje = (diferencia / pred_valor * 100) if pred_valor != 0 else 0
+                    
+                    if diferencia > 0:
+                        tendencia = "mejor"
+                        emoji = "📈"
+                    elif diferencia < 0:
+                        tendencia = "peor"
+                        emoji = "📉"
+                    else:
+                        tendencia = "igual"
+                        emoji = "➡️"
+                    
                     analysis += f"  {emoji} **{concepto}:**\n"
                     analysis += f"    - Rolling Predictivo: ${pred_valor:,.0f}\n"
                     analysis += f"    - Datos Históricos: ${real_valor:,.0f}\n"
                     analysis += f"    - Diferencia: ${diferencia:+,.0f} ({porcentaje:+.1f}%) - {tendencia}\n\n"
         
-        # Comparar por Clasificación
+        # Comparar por Clasificación (variables numéricas - se suman)
         analysis += "🏷️ **Comparación por Clasificación:**\n"
         for clasificacion in variables_comparacion['clasificacion']:
             # Datos de predicción (rolling predictivo)
@@ -519,9 +571,9 @@ class FinancialChatbot:
                     emoji = "➡️"
                 
                 analysis += f"  {emoji} **{clasificacion}:**\n"
-                analysis += f"    - Rolling Predictivo: ${pred_valor:,.0f}\n"
-                analysis += f"    - Datos Históricos: ${real_valor:,.0f}\n"
-                analysis += f"    - Diferencia: ${diferencia:+,.0f} ({porcentaje:+.1f}%) - {tendencia}\n\n"
+                analysis += f"    - Rolling Predictivo: {pred_valor:,.0f}\n"
+                analysis += f"    - Datos Históricos: {real_valor:,.0f}\n"
+                analysis += f"    - Diferencia: {diferencia:+,.0f} ({porcentaje:+.1f}%) - {tendencia}\n\n"
         
         return analysis
     
