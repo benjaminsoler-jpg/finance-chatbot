@@ -434,8 +434,16 @@ class FinancialChatbot:
         # Variables que se suman (valores monetarios)
         sum_variables = ['Originacion Prom']
         
-        # Obtener negocios únicos
-        negocios = ['PYME', 'CORP', 'Brokers', 'WK']
+        # Extraer negocio específico si se menciona
+        negocio_match = re.search(r'(pyme|corp|brokers|wk)', query.lower())
+        if negocio_match:
+            negocio_especifico = negocio_match.group(1).upper()
+            if negocio_especifico == 'BROKERS':
+                negocio_especifico = 'Brokers'
+            negocios = [negocio_especifico]
+        else:
+            # Obtener todos los negocios disponibles
+            negocios = ['PYME', 'CORP', 'Brokers', 'WK']
         
         for negocio in negocios:
             analysis += f"<div class='business-title'>🏢 {negocio}</div>\n\n"
@@ -1307,7 +1315,9 @@ class FinancialChatbot:
             yaxis={'categoryorder': 'total ascending'}
         )
         
-        return f"**Gráfico 1: Top Cambios por Magnitud**\n{fig.to_html(include_plotlyjs='cdn', div_id='top_changes')}\n\n"
+        # Usar st.plotly_chart en lugar de HTML
+        st.plotly_chart(fig, use_container_width=True)
+        return "**Gráfico 1: Top Cambios por Magnitud**\n\n"
     
     def _create_trends_chart(self, cambios_significativos, elaboracion, periodos, escenario):
         """Crear gráfico de líneas para tendencias temporales"""
@@ -1356,7 +1366,9 @@ class FinancialChatbot:
             showlegend=True
         )
         
-        return f"**Gráfico 2: Tendencias Temporales**\n{fig.to_html(include_plotlyjs='cdn', div_id='trends')}\n\n"
+        # Usar st.plotly_chart en lugar de HTML
+        st.plotly_chart(fig, use_container_width=True)
+        return "**Gráfico 2: Tendencias Temporales**\n\n"
     
     def _create_segment_distribution_chart(self, cambios_significativos):
         """Crear gráfico de torta para distribución por segmento"""
@@ -1404,7 +1416,9 @@ class FinancialChatbot:
         
         fig.update_layout(height=400)
         
-        return f"**Gráfico 3: Distribución por Segmento**\n{fig.to_html(include_plotlyjs='cdn', div_id='distribution')}\n\n"
+        # Usar st.plotly_chart en lugar de HTML
+        st.plotly_chart(fig, use_container_width=True)
+        return "**Gráfico 3: Distribución por Segmento**\n\n"
     
     def _create_heatmap_chart(self, cambios_significativos):
         """Crear heatmap de cambios por variable y negocio"""
@@ -1442,7 +1456,9 @@ class FinancialChatbot:
         
         fig.update_layout(height=400)
         
-        return f"**Gráfico 4: Heatmap de Cambios**\n{fig.to_html(include_plotlyjs='cdn', div_id='heatmap')}\n\n"
+        # Usar st.plotly_chart en lugar de HTML
+        st.plotly_chart(fig, use_container_width=True)
+        return "**Gráfico 4: Heatmap de Cambios**\n\n"
     
     def detect_anomalies(self, elaboracion, periodos, escenario, negocios):
         """Detectar anomalías y outliers en los datos financieros"""
