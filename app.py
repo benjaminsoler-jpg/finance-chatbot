@@ -415,8 +415,11 @@ class FinancialChatbot:
         # Variables clave para análisis
         variables_clave = ['Rate All In', 'Originacion Prom', 'Term', 'Risk Rate', 'Fund Rate']
         
-        # Variables que son rates (porcentajes)
+        # Variables que son rates (porcentajes) - no se suman, se muestran por clasificación/cohort
         rate_variables = ['Rate All In', 'Risk Rate', 'Fund Rate']
+        
+        # Variables que se suman (valores monetarios)
+        sum_variables = ['Originacion Prom', 'Term']
         
         # Obtener negocios únicos
         negocios = ['PYME', 'CORP', 'Brokers', 'WK']
@@ -427,53 +430,75 @@ class FinancialChatbot:
             for variable in variables_clave:
                 analysis += f"  📈 **{variable}:**\n"
                 
-                valores_por_periodo = []
-                for periodo in periodos:
-                    # Construir filtro base
-                    filtro = (
-                        (self.df['Elaboracion'] == elaboracion) & 
-                        (self.df['Periodo'] == periodo) & 
-                        (self.df['Concepto'] == variable) &
-                        (self.df['Negocio'] == negocio)
-                    )
-                    
-                    # Agregar filtro de escenario si se especifica
-                    if escenario:
-                        filtro = filtro & (self.df['Escenario'] == escenario)
-                    
-                    data = self.df[filtro]
-                    
-                    if len(data) > 0:
-                        valor = data['Valor'].sum()
-                        valores_por_periodo.append(valor)
+                if variable in rate_variables:
+                    # Para rates: mostrar por clasificación y cohort, no sumar
+                    for periodo in periodos:
+                        # Construir filtro base
+                        filtro = (
+                            (self.df['Elaboracion'] == elaboracion) & 
+                            (self.df['Periodo'] == periodo) & 
+                            (self.df['Concepto'] == variable) &
+                            (self.df['Negocio'] == negocio)
+                        )
                         
-                        # Formatear según el tipo de variable
-                        if variable in rate_variables:
-                            analysis += f"    - {periodo}: {valor:.2f}%\n"
+                        # Agregar filtro de escenario si se especifica
+                        if escenario:
+                            filtro = filtro & (self.df['Escenario'] == escenario)
+                        
+                        data = self.df[filtro]
+                        
+                        if len(data) > 0:
+                            analysis += f"    - {periodo}:\n"
+                            # Agrupar por clasificación y cohort
+                            grouped = data.groupby(['Clasificación', 'Cohort_Act'])['Valor'].first().reset_index()
+                            for _, row in grouped.iterrows():
+                                clasificacion = row['Clasificación'] if pd.notna(row['Clasificación']) else 'Sin clasificación'
+                                cohort = row['Cohort_Act'] if pd.notna(row['Cohort_Act']) else 'Sin cohort'
+                                valor = row['Valor']
+                                analysis += f"      • {clasificacion} ({cohort}): {valor:.2f}%\n"
                         else:
-                            analysis += f"    - {periodo}: ${valor:,}\n"
-                    else:
-                        analysis += f"    - {periodo}: Sin datos\n"
-                
-                if len(valores_por_periodo) > 1:
-                    # Calcular tendencia
-                    primer_valor = valores_por_periodo[0]
-                    ultimo_valor = valores_por_periodo[-1]
+                            analysis += f"    - {periodo}: Sin datos\n"
+                else:
+                    # Para variables monetarias: sumar normalmente
+                    valores_por_periodo = []
+                    for periodo in periodos:
+                        # Construir filtro base
+                        filtro = (
+                            (self.df['Elaboracion'] == elaboracion) & 
+                            (self.df['Periodo'] == periodo) & 
+                            (self.df['Concepto'] == variable) &
+                            (self.df['Negocio'] == negocio)
+                        )
+                        
+                        # Agregar filtro de escenario si se especifica
+                        if escenario:
+                            filtro = filtro & (self.df['Escenario'] == escenario)
+                        
+                        data = self.df[filtro]
+                        
+                        if len(data) > 0:
+                            valor = data['Valor'].sum()
+                            valores_por_periodo.append(valor)
+                            analysis += f"    - {periodo}: ${valor:,.0f}\n"
+                        else:
+                            analysis += f"    - {periodo}: Sin datos\n"
                     
-                    if primer_valor != 0:
-                        cambio = ultimo_valor - primer_valor
-                        porcentaje = (cambio / primer_valor) * 100
+                    if len(valores_por_periodo) > 1:
+                        # Calcular tendencia
+                        primer_valor = valores_por_periodo[0]
+                        ultimo_valor = valores_por_periodo[-1]
                         
-                        if cambio > 0:
-                            tendencia = "📈 Creciendo"
-                        elif cambio < 0:
-                            tendencia = "📉 Decreciendo"
-                        else:
-                            tendencia = "➡️ Estable"
-                        
-                        if variable in rate_variables:
-                            analysis += f"    **Tendencia:** {tendencia} ({porcentaje:+.1f} puntos porcentuales)\n"
-                        else:
+                        if primer_valor != 0:
+                            cambio = ultimo_valor - primer_valor
+                            porcentaje = (cambio / primer_valor) * 100
+                            
+                            if cambio > 0:
+                                tendencia = "📈 Creciendo"
+                            elif cambio < 0:
+                                tendencia = "📉 Decreciendo"
+                            else:
+                                tendencia = "➡️ Estable"
+                            
                             analysis += f"    **Tendencia:** {tendencia} ({porcentaje:+.1f}%)\n"
                 
                 analysis += "\n"
