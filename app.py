@@ -428,10 +428,25 @@ class FinancialChatbot:
                 elaboracion_prediccion = elaboracion2
                 elaboracion_realidad = elaboracion1
         
+        # Extraer filtros adicionales de la consulta
+        filtros_adicionales = self._extract_additional_filters(query)
+        
+        # Determinar si separar por negocio
+        separar_por_negocio = 'separalo por negocio' in query.lower() or 'separar por negocio' in query.lower()
+        
+        # Obtener negocios a analizar
+        if separar_por_negocio:
+            negocios = ['PYME', 'CORP', 'Brokers', 'WK']
+        else:
+            negocios = ['TODOS']  # Análisis consolidado
+        
         analysis = f"📊 **Análisis Rolling: Predicción vs Realidad**\n"
         analysis += f"🎯 **Período analizado:** {periodo}\n"
         analysis += f"📈 **Rolling Predictivo:** {elaboracion_prediccion} (Elaboración = Período)\n"
-        analysis += f"📉 **Datos Históricos:** {elaboracion_realidad} (Elaboración > Período)\n\n"
+        analysis += f"📉 **Datos Históricos:** {elaboracion_realidad} (Elaboración > Período)\n"
+        if separar_por_negocio:
+            analysis += f"🏢 **Análisis separado por Negocio**\n"
+        analysis += "\n"
         
         # Variables específicas para comparar
         variables_comparacion = {
@@ -439,80 +454,139 @@ class FinancialChatbot:
             'clasificacion': ['New Active', 'Churn Bruto', 'Resucitados']
         }
         
-        # Comparar por Concepto
-        analysis += "📋 **Comparación por Concepto:**\n"
-        for concepto in variables_comparacion['concepto']:
-            if concepto in ['Rate All In', 'Risk Rate', 'Fund Rate', 'Term']:
-                # Para rates y term: comparar por cohorts
-                analysis += f"📈 **{concepto}:**\n"
-                
-                # Obtener datos de predicción por cohort
-                pred_data = self.df[
-                    (self.df['Elaboracion'] == elaboracion_prediccion) & 
-                    (self.df['Periodo'] == periodo) & 
-                    (self.df['Concepto'] == concepto)
-                ]
-                
-                # Obtener datos de realidad por cohort
-                real_data = self.df[
-                    (self.df['Elaboracion'] == elaboracion_realidad) & 
-                    (self.df['Periodo'] == periodo) & 
-                    (self.df['Concepto'] == concepto)
-                ]
-                
-                if len(pred_data) > 0 and len(real_data) > 0:
-                    # Agrupar por cohort y tomar el primer valor único
-                    pred_grouped = pred_data.groupby('Cohort_Act')['Valor'].first()
-                    real_grouped = real_data.groupby('Cohort_Act')['Valor'].first()
+        # Iterar por cada negocio
+        for negocio in negocios:
+            if separar_por_negocio:
+                analysis += f"<div class='business-title'>🏢 {negocio}</div>\n\n"
+            
+            # Comparar por Concepto
+            analysis += "📋 **Comparación por Concepto:**\n"
+            for concepto in variables_comparacion['concepto']:
+                if concepto in ['Rate All In', 'Risk Rate', 'Fund Rate', 'Term']:
+                    # Para rates y term: comparar por cohorts
+                    analysis += f"📈 **{concepto}:**\n"
                     
-                    # Obtener cohorts comunes
-                    cohorts_comunes = set(pred_grouped.index) & set(real_grouped.index)
+                    # Obtener datos de predicción por cohort
+                    pred_data = self.df[
+                        (self.df['Elaboracion'] == elaboracion_prediccion) & 
+                        (self.df['Periodo'] == periodo) & 
+                        (self.df['Concepto'] == concepto)
+                    ]
                     
-                    if cohorts_comunes:
-                        for cohort in sorted(cohorts_comunes):
-                            pred_valor = pred_grouped[cohort]
-                            real_valor = real_grouped[cohort]
-                            
-                            diferencia = real_valor - pred_valor
-                            
-                            if diferencia > 0:
-                                tendencia = "mejor"
-                                emoji = "📈"
-                            elif diferencia < 0:
-                                tendencia = "peor"
-                                emoji = "📉"
-                            else:
-                                tendencia = "igual"
-                                emoji = "➡️"
-                            
-                            if concepto == 'Term':
-                                analysis += f"    {emoji} **{cohort}:**\n"
-                                analysis += f"      - Rolling Predictivo: {pred_valor:.0f}\n"
-                                analysis += f"      - Datos Históricos: {real_valor:.0f}\n"
-                                analysis += f"      - Diferencia: {diferencia:+.0f} - {tendencia}\n"
-                            else:  # Rates
-                                analysis += f"    {emoji} **{cohort}:**\n"
-                                analysis += f"      - Rolling Predictivo: {pred_valor*100:.2f}%\n"
-                                analysis += f"      - Datos Históricos: {real_valor*100:.2f}%\n"
-                                analysis += f"      - Diferencia: {diferencia*100:+.2f}pp - {tendencia}\n"
-                        analysis += "\n"
+                    # Obtener datos de realidad por cohort
+                    real_data = self.df[
+                        (self.df['Elaboracion'] == elaboracion_realidad) & 
+                        (self.df['Periodo'] == periodo) & 
+                        (self.df['Concepto'] == concepto)
+                    ]
+                    
+                    # Aplicar filtro de negocio si es necesario
+                    if separar_por_negocio:
+                        pred_data = pred_data[pred_data['Negocio'] == negocio]
+                        real_data = real_data[real_data['Negocio'] == negocio]
+                    
+                    if len(pred_data) > 0 and len(real_data) > 0:
+                        # Agrupar por cohort y tomar el primer valor único
+                        pred_grouped = pred_data.groupby('Cohort_Act')['Valor'].first()
+                        real_grouped = real_data.groupby('Cohort_Act')['Valor'].first()
+                        
+                        # Obtener cohorts comunes
+                        cohorts_comunes = set(pred_grouped.index) & set(real_grouped.index)
+                        
+                        if cohorts_comunes:
+                            for cohort in sorted(cohorts_comunes):
+                                pred_valor = pred_grouped[cohort]
+                                real_valor = real_grouped[cohort]
+                                
+                                diferencia = real_valor - pred_valor
+                                
+                                if diferencia > 0:
+                                    tendencia = "mejor"
+                                    emoji = "📈"
+                                elif diferencia < 0:
+                                    tendencia = "peor"
+                                    emoji = "📉"
+                                else:
+                                    tendencia = "igual"
+                                    emoji = "➡️"
+                                
+                                if concepto == 'Term':
+                                    analysis += f"    {emoji} **{cohort}:**\n"
+                                    analysis += f"      - Rolling Predictivo: {pred_valor:.0f}\n"
+                                    analysis += f"      - Datos Históricos: {real_valor:.0f}\n"
+                                    analysis += f"      - Diferencia: {diferencia:+.0f} - {tendencia}\n"
+                                else:  # Rates
+                                    analysis += f"    {emoji} **{cohort}:**\n"
+                                    analysis += f"      - Rolling Predictivo: {pred_valor*100:.2f}%\n"
+                                    analysis += f"      - Datos Históricos: {real_valor*100:.2f}%\n"
+                                    analysis += f"      - Diferencia: {diferencia*100:+.2f}pp - {tendencia}\n"
+                            analysis += "\n"
+                        else:
+                            analysis += f"    - No hay cohorts comunes para comparar\n\n"
                     else:
-                        analysis += f"    - No hay cohorts comunes para comparar\n\n"
+                        analysis += f"    - No hay datos disponibles para comparar\n\n"
                 else:
-                    analysis += f"    - No hay datos disponibles para comparar\n\n"
-            else:
-                # Para variables monetarias: sumar y comparar
+                    # Para variables monetarias: sumar y comparar
+                    pred_data = self.df[
+                        (self.df['Elaboracion'] == elaboracion_prediccion) & 
+                        (self.df['Periodo'] == periodo) & 
+                        (self.df['Concepto'] == concepto)
+                    ]
+                    
+                    real_data = self.df[
+                        (self.df['Elaboracion'] == elaboracion_realidad) & 
+                        (self.df['Periodo'] == periodo) & 
+                        (self.df['Concepto'] == concepto)
+                    ]
+                    
+                    # Aplicar filtro de negocio si es necesario
+                    if separar_por_negocio:
+                        pred_data = pred_data[pred_data['Negocio'] == negocio]
+                        real_data = real_data[real_data['Negocio'] == negocio]
+                    
+                    if len(pred_data) > 0 and len(real_data) > 0:
+                        pred_valor = pred_data['Valor'].sum()
+                        real_valor = real_data['Valor'].sum()
+                        
+                        diferencia = real_valor - pred_valor
+                        porcentaje = (diferencia / pred_valor * 100) if pred_valor != 0 else 0
+                        
+                        if diferencia > 0:
+                            tendencia = "mejor"
+                            emoji = "📈"
+                        elif diferencia < 0:
+                            tendencia = "peor"
+                            emoji = "📉"
+                        else:
+                            tendencia = "igual"
+                            emoji = "➡️"
+                        
+                        analysis += f"  {emoji} **{concepto}:**\n"
+                        analysis += f"    - Rolling Predictivo: ${pred_valor:,.0f}\n"
+                        analysis += f"    - Datos Históricos: ${real_valor:,.0f}\n"
+                        analysis += f"    - Diferencia: ${diferencia:+,.0f} ({porcentaje:+.1f}%) - {tendencia}\n\n"
+            
+            # Comparar por Clasificación (variables numéricas - se suman)
+            analysis += "🏷️ **Comparación por Clasificación:**\n"
+            for clasificacion in variables_comparacion['clasificacion']:
+                # Datos de predicción (rolling predictivo)
                 pred_data = self.df[
                     (self.df['Elaboracion'] == elaboracion_prediccion) & 
                     (self.df['Periodo'] == periodo) & 
-                    (self.df['Concepto'] == concepto)
+                    (self.df['Clasificación'] == clasificacion)
                 ]
                 
+                # Datos de realidad (históricos)
                 real_data = self.df[
                     (self.df['Elaboracion'] == elaboracion_realidad) & 
                     (self.df['Periodo'] == periodo) & 
-                    (self.df['Concepto'] == concepto)
+                    (self.df['Clasificación'] == clasificacion)
                 ]
+                
+                # Aplicar filtro de negocio si es necesario
+                if separar_por_negocio:
+                    pred_data = pred_data[pred_data['Negocio'] == negocio]
+                    real_data = real_data[real_data['Negocio'] == negocio]
                 
                 if len(pred_data) > 0 and len(real_data) > 0:
                     pred_valor = pred_data['Valor'].sum()
@@ -531,49 +605,13 @@ class FinancialChatbot:
                         tendencia = "igual"
                         emoji = "➡️"
                     
-                    analysis += f"  {emoji} **{concepto}:**\n"
-                    analysis += f"    - Rolling Predictivo: ${pred_valor:,.0f}\n"
-                    analysis += f"    - Datos Históricos: ${real_valor:,.0f}\n"
-                    analysis += f"    - Diferencia: ${diferencia:+,.0f} ({porcentaje:+.1f}%) - {tendencia}\n\n"
-        
-        # Comparar por Clasificación (variables numéricas - se suman)
-        analysis += "🏷️ **Comparación por Clasificación:**\n"
-        for clasificacion in variables_comparacion['clasificacion']:
-            # Datos de predicción (rolling predictivo)
-            pred_data = self.df[
-                (self.df['Elaboracion'] == elaboracion_prediccion) & 
-                (self.df['Periodo'] == periodo) & 
-                (self.df['Clasificación'] == clasificacion)
-            ]
+                    analysis += f"  {emoji} **{clasificacion}:**\n"
+                    analysis += f"    - Rolling Predictivo: {pred_valor:,.0f}\n"
+                    analysis += f"    - Datos Históricos: {real_valor:,.0f}\n"
+                    analysis += f"    - Diferencia: {diferencia:+,.0f} ({porcentaje:+.1f}%) - {tendencia}\n\n"
             
-            # Datos de realidad (históricos)
-            real_data = self.df[
-                (self.df['Elaboracion'] == elaboracion_realidad) & 
-                (self.df['Periodo'] == periodo) & 
-                (self.df['Clasificación'] == clasificacion)
-            ]
-            
-            if len(pred_data) > 0 and len(real_data) > 0:
-                pred_valor = pred_data['Valor'].sum()
-                real_valor = real_data['Valor'].sum()
-                
-                diferencia = real_valor - pred_valor
-                porcentaje = (diferencia / pred_valor * 100) if pred_valor != 0 else 0
-                
-                if diferencia > 0:
-                    tendencia = "mejor"
-                    emoji = "📈"
-                elif diferencia < 0:
-                    tendencia = "peor"
-                    emoji = "📉"
-                else:
-                    tendencia = "igual"
-                    emoji = "➡️"
-                
-                analysis += f"  {emoji} **{clasificacion}:**\n"
-                analysis += f"    - Rolling Predictivo: {pred_valor:,.0f}\n"
-                analysis += f"    - Datos Históricos: {real_valor:,.0f}\n"
-                analysis += f"    - Diferencia: {diferencia:+,.0f} ({porcentaje:+.1f}%) - {tendencia}\n\n"
+            if separar_por_negocio:
+                analysis += "---\n\n"
         
         return analysis
     
