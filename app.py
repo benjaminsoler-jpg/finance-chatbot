@@ -534,7 +534,11 @@ class FinancialChatbot:
             # Usar el prompt apropiado según el tipo de consulta
             system_prompt = "Eres un asistente inteligente y versátil. Para preguntas financieras, análisis de datos y temas de negocio, eres un experto serio y profesional que proporciona información precisa y detallada. Para preguntas cotidianas, conversaciones casuales o temas generales, eres amigable, conversacional y como un buen amigo. Adapta tu tono según el contexto: serio para finanzas, casual y amigable para todo lo demás."
             
-            response = openai.ChatCompletion.create(
+            # Usar la nueva API de OpenAI
+            from openai import OpenAI
+            client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+            
+            response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": system_prompt},
