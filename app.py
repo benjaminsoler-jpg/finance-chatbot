@@ -92,9 +92,9 @@ class FinancialChatbot:
             
             # Limpiar datos
             self.df.columns = self.df.columns.str.strip()
-            # Convertir a enteros: quitar comas, convertir a float, luego a int
+            # Convertir a numérico: quitar comas, convertir a float
             self.df['Valor'] = self.df['Valor'].astype(str).str.replace(',', '')
-            self.df['Valor'] = pd.to_numeric(self.df['Valor'], errors='coerce').fillna(0).astype(int)
+            self.df['Valor'] = pd.to_numeric(self.df['Valor'], errors='coerce').fillna(0)
             self.df.dropna(subset=['Valor'], inplace=True)
             
             st.success(f"✅ Datos cargados: {len(self.df):,} registros")
