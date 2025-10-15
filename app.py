@@ -610,7 +610,667 @@ class FinancialChatbot:
             if separar_por_negocio:
                 analysis += "---\n\n"
         
+        # Agregar storytelling ejecutivo
+        analysis += self._generate_rolling_storytelling(elaboracion_prediccion, elaboracion_realidad, periodo, separar_por_negocio, negocios)
+        
+        # Agregar gráficos interactivos
+        analysis += self._generate_rolling_visualizations(elaboracion_prediccion, elaboracion_realidad, periodo, separar_por_negocio, negocios)
+        
         return analysis
+    
+    def _generate_rolling_storytelling(self, elaboracion_prediccion, elaboracion_realidad, periodo, separar_por_negocio, negocios):
+        """Generar storytelling ejecutivo para comparación rolling"""
+        analysis = ""
+        
+        # Obtener datos para análisis
+        variables_clave = ['Rate All In', 'Originacion Prom', 'Term', 'Risk Rate', 'Fund Rate']
+        clasificaciones_clave = ['New Active', 'Churn Bruto', 'Resucitados']
+        
+        analysis += "---\n\n"
+        analysis += "## 📖 **ANÁLISIS EJECUTIVO ROLLING**\n\n"
+        
+        # Análisis general
+        analysis += "### 🎯 **RESUMEN EJECUTIVO**\n\n"
+        analysis += f"El análisis de **rolling predictivo** vs **realidad histórica** para el período **{periodo}** revela insights críticos sobre la **precisión de nuestros modelos predictivos** y las **dinámicas del mercado**. "
+        analysis += f"La comparación entre la **elaboración {elaboracion_prediccion}** (predicción) y la **elaboración {elaboracion_realidad}** (realidad) proporciona una **evaluación objetiva** de nuestro desempeño en la **planificación financiera**.\n\n"
+        
+        if separar_por_negocio:
+            analysis += "### 🏢 **ANÁLISIS POR SEGMENTO DE NEGOCIO**\n\n"
+            
+            for negocio in negocios:
+                # Obtener datos específicos del negocio
+                negocio_data = self._get_rolling_negocio_summary(elaboracion_prediccion, elaboracion_realidad, periodo, negocio, variables_clave, clasificaciones_clave)
+                
+                if negocio_data:
+                    analysis += f"#### **{negocio}**\n\n"
+                    analysis += f"{negocio_data['story']}\n\n"
+        else:
+            # Análisis consolidado
+            consolidated_data = self._get_rolling_consolidated_summary(elaboracion_prediccion, elaboracion_realidad, periodo, variables_clave, clasificaciones_clave)
+            if consolidated_data:
+                analysis += f"### 📊 **ANÁLISIS CONSOLIDADO**\n\n"
+                analysis += f"{consolidated_data['story']}\n\n"
+        
+        # Recomendaciones estratégicas
+        analysis += "### 💡 **RECOMENDACIONES ESTRATÉGICAS**\n\n"
+        analysis += "Basado en este análisis de **rolling predictivo**, se recomienda:\n\n"
+        analysis += "• **Revisar modelos predictivos** en variables con desviaciones significativas (>5%)\n"
+        analysis += "• **Ajustar estrategias de pricing** según la precisión de Rate All In por cohort\n"
+        analysis += "• **Optimizar gestión de riesgo** basada en la precisión de Risk Rate\n"
+        analysis += "• **Mejorar proyecciones de originación** para mayor precisión en planificación\n"
+        analysis += "• **Implementar monitoreo continuo** de la precisión predictiva por segmento\n\n"
+        
+        return analysis
+    
+    def _get_rolling_negocio_summary(self, elaboracion_prediccion, elaboracion_realidad, periodo, negocio, variables_clave, clasificaciones_clave):
+        """Obtener resumen específico por negocio para storytelling"""
+        try:
+            # Obtener datos de predicción y realidad
+            pred_data = self.df[
+                (self.df['Elaboracion'] == elaboracion_prediccion) & 
+                (self.df['Periodo'] == periodo) & 
+                (self.df['Negocio'] == negocio)
+            ]
+            
+            real_data = self.df[
+                (self.df['Elaboracion'] == elaboracion_realidad) & 
+                (self.df['Periodo'] == periodo) & 
+                (self.df['Negocio'] == negocio)
+            ]
+            
+            if len(pred_data) == 0 or len(real_data) == 0:
+                return None
+            
+            # Analizar variables clave
+            insights = []
+            
+            # Rate All In por cohort
+            rate_all_in_pred = pred_data[pred_data['Concepto'] == 'Rate All In'].groupby('Cohort_Act')['Valor'].first()
+            rate_all_in_real = real_data[real_data['Concepto'] == 'Rate All In'].groupby('Cohort_Act')['Valor'].first()
+            
+            if len(rate_all_in_pred) > 0 and len(rate_all_in_real) > 0:
+                cohorts_comunes = set(rate_all_in_pred.index) & set(rate_all_in_real.index)
+                if cohorts_comunes:
+                    mejoras = 0
+                    deterioros = 0
+                    for cohort in cohorts_comunes:
+                        diff = (rate_all_in_real[cohort] - rate_all_in_pred[cohort]) * 100
+                        if diff > 0.05:  # >0.05pp mejora
+                            mejoras += 1
+                        elif diff < -0.05:  # <-0.05pp deterioro
+                            deterioros += 1
+                    
+                    if mejoras > deterioros:
+                        insights.append(f"**Rate All In** muestra **mejoras** en la mayoría de cohorts, indicando **precisión predictiva** en pricing")
+                    elif deterioros > mejoras:
+                        insights.append(f"**Rate All In** presenta **desviaciones negativas** en múltiples cohorts, sugiriendo **revisión del modelo de pricing**")
+                    else:
+                        insights.append(f"**Rate All In** mantiene **estabilidad** entre predicción y realidad")
+            
+            # Originacion Prom
+            originacion_pred = pred_data[pred_data['Concepto'] == 'Originacion Prom']['Valor'].sum()
+            originacion_real = real_data[real_data['Concepto'] == 'Originacion Prom']['Valor'].sum()
+            
+            if originacion_pred > 0 and originacion_real > 0:
+                diff_pct = ((originacion_real - originacion_pred) / originacion_pred) * 100
+                if abs(diff_pct) > 5:
+                    if diff_pct > 0:
+                        insights.append(f"**Originación** superó las expectativas en **{abs(diff_pct):.1f}%**, demostrando **fortaleza del mercado**")
+                    else:
+                        insights.append(f"**Originación** estuvo **{abs(diff_pct):.1f}%** por debajo de la predicción, indicando **desafíos de mercado**")
+                else:
+                    insights.append(f"**Originación** se alineó estrechamente con las predicciones, mostrando **precisión del modelo**")
+            
+            # New Active
+            new_active_pred = pred_data[pred_data['Clasificación'] == 'New Active']['Valor'].sum()
+            new_active_real = real_data[real_data['Clasificación'] == 'New Active']['Valor'].sum()
+            
+            if new_active_pred > 0 and new_active_real > 0:
+                diff_pct = ((new_active_real - new_active_pred) / new_active_pred) * 100
+                if abs(diff_pct) > 10:
+                    if diff_pct > 0:
+                        insights.append(f"**Adquisición de clientes** superó las proyecciones en **{abs(diff_pct):.1f}%**, reflejando **efectividad de estrategias de marketing**")
+                    else:
+                        insights.append(f"**Adquisición de clientes** estuvo **{abs(diff_pct):.1f}%** por debajo de las proyecciones, requiriendo **ajuste en estrategias de adquisición**")
+            
+            # Generar story
+            if insights:
+                story = f"El segmento **{negocio}** presenta un **comportamiento mixto** en la comparación rolling. "
+                story += " ".join(insights) + ". "
+                
+                # Conclusión específica
+                if len(insights) >= 3:
+                    story += f"En general, **{negocio}** muestra **variabilidad** en la precisión predictiva, sugiriendo la necesidad de **modelos más granulares** para este segmento."
+                else:
+                    story += f"El segmento **{negocio}** mantiene **consistencia** en la mayoría de indicadores, validando las **estrategias actuales**."
+                
+                return {'story': story}
+            
+            return None
+            
+        except Exception as e:
+            return None
+    
+    def _get_rolling_consolidated_summary(self, elaboracion_prediccion, elaboracion_realidad, periodo, variables_clave, clasificaciones_clave):
+        """Obtener resumen consolidado para storytelling"""
+        try:
+            # Obtener datos consolidados
+            pred_data = self.df[
+                (self.df['Elaboracion'] == elaboracion_prediccion) & 
+                (self.df['Periodo'] == periodo)
+            ]
+            
+            real_data = self.df[
+                (self.df['Elaboracion'] == elaboracion_realidad) & 
+                (self.df['Periodo'] == periodo)
+            ]
+            
+            if len(pred_data) == 0 or len(real_data) == 0:
+                return None
+            
+            # Análisis consolidado
+            insights = []
+            
+            # Rate All In consolidado
+            rate_all_in_pred = pred_data[pred_data['Concepto'] == 'Rate All In']['Valor'].mean()
+            rate_all_in_real = real_data[real_data['Concepto'] == 'Rate All In']['Valor'].mean()
+            
+            if rate_all_in_pred > 0 and rate_all_in_real > 0:
+                diff_pp = (rate_all_in_real - rate_all_in_pred) * 100
+                if abs(diff_pp) > 0.1:
+                    if diff_pp > 0:
+                        insights.append(f"**Rate All In** promedio superó las predicciones en **{diff_pp:.2f}pp**, indicando **mejor performance de pricing**")
+                    else:
+                        insights.append(f"**Rate All In** promedio estuvo **{abs(diff_pp):.2f}pp** por debajo de las predicciones, sugiriendo **presión competitiva**")
+                else:
+                    insights.append(f"**Rate All In** promedio se mantuvo **estable** respecto a las predicciones")
+            
+            # Originacion Prom consolidado
+            originacion_pred = pred_data[pred_data['Concepto'] == 'Originacion Prom']['Valor'].sum()
+            originacion_real = real_data[real_data['Concepto'] == 'Originacion Prom']['Valor'].sum()
+            
+            if originacion_pred > 0 and originacion_real > 0:
+                diff_pct = ((originacion_real - originacion_pred) / originacion_pred) * 100
+                if abs(diff_pct) > 3:
+                    if diff_pct > 0:
+                        insights.append(f"**Originación total** superó las proyecciones en **{diff_pct:.1f}%**, demostrando **fortaleza del mercado**")
+                    else:
+                        insights.append(f"**Originación total** estuvo **{abs(diff_pct):.1f}%** por debajo de las proyecciones, indicando **desafíos de mercado**")
+                else:
+                    insights.append(f"**Originación total** se alineó **precisamente** con las proyecciones")
+            
+            # New Active consolidado
+            new_active_pred = pred_data[pred_data['Clasificación'] == 'New Active']['Valor'].sum()
+            new_active_real = real_data[real_data['Clasificación'] == 'New Active']['Valor'].sum()
+            
+            if new_active_pred > 0 and new_active_real > 0:
+                diff_pct = ((new_active_real - new_active_pred) / new_active_pred) * 100
+                if abs(diff_pct) > 5:
+                    if diff_pct > 0:
+                        insights.append(f"**Adquisición de clientes** superó las proyecciones en **{diff_pct:.1f}%**, validando **estrategias de crecimiento**")
+                    else:
+                        insights.append(f"**Adquisición de clientes** estuvo **{abs(diff_pct):.1f}%** por debajo de las proyecciones, requiriendo **ajuste estratégico**")
+            
+            # Generar story consolidado
+            if insights:
+                story = f"El análisis **consolidado** del rolling predictivo revela un **panorama diverso** en la precisión de nuestros modelos. "
+                story += " ".join(insights) + ". "
+                story += "Esta **variabilidad** en la precisión predictiva subraya la importancia de **modelos adaptativos** y **monitoreo continuo** para optimizar la **planificación financiera**."
+                
+                return {'story': story}
+            
+            return None
+            
+        except Exception as e:
+            return None
+    
+    def _generate_rolling_visualizations(self, elaboracion_prediccion, elaboracion_realidad, periodo, separar_por_negocio, negocios):
+        """Generar visualizaciones interactivas para comparación rolling"""
+        try:
+            import plotly.express as px
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
+            import pandas as pd
+            
+            analysis = ""
+            analysis += "---\n\n"
+            analysis += "## 📊 **VISUALIZACIONES INTERACTIVAS**\n\n"
+            
+            # 1. Gráfico de barras - Comparación por Variable
+            analysis += "### 📈 **Gráfico 1: Comparación Predicción vs Realidad por Variable**\n"
+            self._create_rolling_comparison_chart(elaboracion_prediccion, elaboracion_realidad, periodo, separar_por_negocio, negocios)
+            
+            # 2. Gráfico de dispersión - Precisión Predictiva
+            analysis += "### 🎯 **Gráfico 2: Precisión Predictiva por Segmento**\n"
+            self._create_rolling_accuracy_chart(elaboracion_prediccion, elaboracion_realidad, periodo, separar_por_negocio, negocios)
+            
+            # 3. Heatmap - Desviaciones por Cohort
+            analysis += "### 🔥 **Gráfico 3: Heatmap de Desviaciones por Cohort**\n"
+            self._create_rolling_heatmap_chart(elaboracion_prediccion, elaboracion_realidad, periodo, separar_por_negocio, negocios)
+            
+            # 4. Gráfico de líneas - Tendencias por Negocio
+            if separar_por_negocio:
+                analysis += "### 📊 **Gráfico 4: Tendencias por Segmento de Negocio**\n"
+                self._create_rolling_trends_chart(elaboracion_prediccion, elaboracion_realidad, periodo, negocios)
+            
+            return analysis
+            
+        except Exception as e:
+            return ""
+    
+    def _create_rolling_comparison_chart(self, elaboracion_prediccion, elaboracion_realidad, periodo, separar_por_negocio, negocios):
+        """Crear gráfico de comparación predicción vs realidad"""
+        try:
+            import plotly.express as px
+            import pandas as pd
+            
+            # Obtener datos
+            variables = ['Rate All In', 'Originacion Prom', 'Term', 'Risk Rate', 'Fund Rate']
+            data = []
+            
+            for variable in variables:
+                if variable in ['Rate All In', 'Risk Rate', 'Fund Rate', 'Term']:
+                    # Para rates y term: promedio por cohort
+                    pred_data = self.df[
+                        (self.df['Elaboracion'] == elaboracion_prediccion) & 
+                        (self.df['Periodo'] == periodo) & 
+                        (self.df['Concepto'] == variable)
+                    ]
+                    real_data = self.df[
+                        (self.df['Elaboracion'] == elaboracion_realidad) & 
+                        (self.df['Periodo'] == periodo) & 
+                        (self.df['Concepto'] == variable)
+                    ]
+                    
+                    if separar_por_negocio:
+                        for negocio in negocios:
+                            pred_negocio = pred_data[pred_data['Negocio'] == negocio]
+                            real_negocio = real_data[real_data['Negocio'] == negocio]
+                            
+                            if len(pred_negocio) > 0 and len(real_negocio) > 0:
+                                pred_valor = pred_negocio.groupby('Cohort_Act')['Valor'].first().mean()
+                                real_valor = real_negocio.groupby('Cohort_Act')['Valor'].first().mean()
+                                
+                                if variable == 'Term':
+                                    data.append({
+                                        'Variable': f"{variable} - {negocio}",
+                                        'Predicción': pred_valor,
+                                        'Realidad': real_valor,
+                                        'Tipo': 'Term'
+                                    })
+                                else:
+                                    data.append({
+                                        'Variable': f"{variable} - {negocio}",
+                                        'Predicción': pred_valor * 100,
+                                        'Realidad': real_valor * 100,
+                                        'Tipo': 'Rate (%)'
+                                    })
+                    else:
+                        if len(pred_data) > 0 and len(real_data) > 0:
+                            pred_valor = pred_data.groupby('Cohort_Act')['Valor'].first().mean()
+                            real_valor = real_data.groupby('Cohort_Act')['Valor'].first().mean()
+                            
+                            if variable == 'Term':
+                                data.append({
+                                    'Variable': variable,
+                                    'Predicción': pred_valor,
+                                    'Realidad': real_valor,
+                                    'Tipo': 'Term'
+                                })
+                            else:
+                                data.append({
+                                    'Variable': variable,
+                                    'Predicción': pred_valor * 100,
+                                    'Realidad': real_valor * 100,
+                                    'Tipo': 'Rate (%)'
+                                })
+                else:
+                    # Para variables monetarias: suma total
+                    pred_data = self.df[
+                        (self.df['Elaboracion'] == elaboracion_prediccion) & 
+                        (self.df['Periodo'] == periodo) & 
+                        (self.df['Concepto'] == variable)
+                    ]
+                    real_data = self.df[
+                        (self.df['Elaboracion'] == elaboracion_realidad) & 
+                        (self.df['Periodo'] == periodo) & 
+                        (self.df['Concepto'] == variable)
+                    ]
+                    
+                    if separar_por_negocio:
+                        for negocio in negocios:
+                            pred_negocio = pred_data[pred_data['Negocio'] == negocio]
+                            real_negocio = real_data[real_data['Negocio'] == negocio]
+                            
+                            if len(pred_negocio) > 0 and len(real_negocio) > 0:
+                                pred_valor = pred_negocio['Valor'].sum() / 1_000_000  # En millones
+                                real_valor = real_negocio['Valor'].sum() / 1_000_000
+                                
+                                data.append({
+                                    'Variable': f"{variable} - {negocio}",
+                                    'Predicción': pred_valor,
+                                    'Realidad': real_valor,
+                                    'Tipo': 'Monetario (M$)'
+                                })
+                    else:
+                        if len(pred_data) > 0 and len(real_data) > 0:
+                            pred_valor = pred_data['Valor'].sum() / 1_000_000
+                            real_valor = real_data['Valor'].sum() / 1_000_000
+                            
+                            data.append({
+                                'Variable': variable,
+                                'Predicción': pred_valor,
+                                'Realidad': real_valor,
+                                'Tipo': 'Monetario (M$)'
+                            })
+            
+            if data:
+                df = pd.DataFrame(data)
+                
+                # Crear gráfico de barras agrupadas
+                fig = go.Figure()
+                
+                fig.add_trace(go.Bar(
+                    name='Predicción',
+                    x=df['Variable'],
+                    y=df['Predicción'],
+                    marker_color='#3498db',
+                    text=df['Predicción'].round(2),
+                    textposition='auto'
+                ))
+                
+                fig.add_trace(go.Bar(
+                    name='Realidad',
+                    x=df['Variable'],
+                    y=df['Realidad'],
+                    marker_color='#e74c3c',
+                    text=df['Realidad'].round(2),
+                    textposition='auto'
+                ))
+                
+                fig.update_layout(
+                    title="Comparación Rolling: Predicción vs Realidad",
+                    xaxis_title="Variables",
+                    yaxis_title="Valores",
+                    barmode='group',
+                    height=500,
+                    showlegend=True
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+            
+        except Exception as e:
+            st.info("No se pudieron generar los datos para el gráfico de comparación.")
+    
+    def _create_rolling_accuracy_chart(self, elaboracion_prediccion, elaboracion_realidad, periodo, separar_por_negocio, negocios):
+        """Crear gráfico de precisión predictiva"""
+        try:
+            import plotly.express as px
+            import pandas as pd
+            
+            data = []
+            
+            if separar_por_negocio:
+                for negocio in negocios:
+                    # Obtener datos del negocio
+                    pred_data = self.df[
+                        (self.df['Elaboracion'] == elaboracion_prediccion) & 
+                        (self.df['Periodo'] == periodo) & 
+                        (self.df['Negocio'] == negocio)
+                    ]
+                    real_data = self.df[
+                        (self.df['Elaboracion'] == elaboracion_realidad) & 
+                        (self.df['Periodo'] == periodo) & 
+                        (self.df['Negocio'] == negocio)
+                    ]
+                    
+                    if len(pred_data) > 0 and len(real_data) > 0:
+                        # Calcular precisión para Rate All In
+                        rate_pred = pred_data[pred_data['Concepto'] == 'Rate All In'].groupby('Cohort_Act')['Valor'].first().mean()
+                        rate_real = real_data[real_data['Concepto'] == 'Rate All In'].groupby('Cohort_Act')['Valor'].first().mean()
+                        
+                        if rate_pred > 0 and rate_real > 0:
+                            accuracy = 100 - abs((rate_real - rate_pred) / rate_pred * 100)
+                            data.append({
+                                'Negocio': negocio,
+                                'Precisión (%)': accuracy,
+                                'Variable': 'Rate All In'
+                            })
+                        
+                        # Calcular precisión para Originacion Prom
+                        orig_pred = pred_data[pred_data['Concepto'] == 'Originacion Prom']['Valor'].sum()
+                        orig_real = real_data[real_data['Concepto'] == 'Originacion Prom']['Valor'].sum()
+                        
+                        if orig_pred > 0 and orig_real > 0:
+                            accuracy = 100 - abs((orig_real - orig_pred) / orig_pred * 100)
+                            data.append({
+                                'Negocio': negocio,
+                                'Precisión (%)': accuracy,
+                                'Variable': 'Originacion Prom'
+                            })
+            else:
+                # Análisis consolidado
+                pred_data = self.df[
+                    (self.df['Elaboracion'] == elaboracion_prediccion) & 
+                    (self.df['Periodo'] == periodo)
+                ]
+                real_data = self.df[
+                    (self.df['Elaboracion'] == elaboracion_realidad) & 
+                    (self.df['Periodo'] == periodo)
+                ]
+                
+                if len(pred_data) > 0 and len(real_data) > 0:
+                    # Rate All In consolidado
+                    rate_pred = pred_data[pred_data['Concepto'] == 'Rate All In']['Valor'].mean()
+                    rate_real = real_data[real_data['Concepto'] == 'Rate All In']['Valor'].mean()
+                    
+                    if rate_pred > 0 and rate_real > 0:
+                        accuracy = 100 - abs((rate_real - rate_pred) / rate_pred * 100)
+                        data.append({
+                            'Negocio': 'Consolidado',
+                            'Precisión (%)': accuracy,
+                            'Variable': 'Rate All In'
+                        })
+                    
+                    # Originacion Prom consolidado
+                    orig_pred = pred_data[pred_data['Concepto'] == 'Originacion Prom']['Valor'].sum()
+                    orig_real = real_data[real_data['Concepto'] == 'Originacion Prom']['Valor'].sum()
+                    
+                    if orig_pred > 0 and orig_real > 0:
+                        accuracy = 100 - abs((orig_real - orig_pred) / orig_pred * 100)
+                        data.append({
+                            'Negocio': 'Consolidado',
+                            'Precisión (%)': accuracy,
+                            'Variable': 'Originacion Prom'
+                        })
+            
+            if data:
+                df = pd.DataFrame(data)
+                
+                fig = px.scatter(
+                    df, 
+                    x='Negocio', 
+                    y='Precisión (%)', 
+                    color='Variable',
+                    size='Precisión (%)',
+                    title="Precisión Predictiva por Segmento",
+                    labels={'Precisión (%)': 'Precisión (%)', 'Negocio': 'Segmento'}
+                )
+                
+                fig.update_layout(
+                    height=400,
+                    showlegend=True
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+            
+        except Exception as e:
+            st.info("No se pudieron generar los datos para el gráfico de precisión.")
+    
+    def _create_rolling_heatmap_chart(self, elaboracion_prediccion, elaboracion_realidad, periodo, separar_por_negocio, negocios):
+        """Crear heatmap de desviaciones por cohort"""
+        try:
+            import plotly.express as px
+            import pandas as pd
+            import numpy as np
+            
+            # Obtener datos de Rate All In por cohort
+            pred_data = self.df[
+                (self.df['Elaboracion'] == elaboracion_prediccion) & 
+                (self.df['Periodo'] == periodo) & 
+                (self.df['Concepto'] == 'Rate All In')
+            ]
+            real_data = self.df[
+                (self.df['Elaboracion'] == elaboracion_realidad) & 
+                (self.df['Periodo'] == periodo) & 
+                (self.df['Concepto'] == 'Rate All In')
+            ]
+            
+            if len(pred_data) > 0 and len(real_data) > 0:
+                # Crear matriz de desviaciones
+                cohorts = sorted(set(pred_data['Cohort_Act'].unique()) | set(real_data['Cohort_Act'].unique()))
+                
+                if separar_por_negocio:
+                    negocio_list = negocios
+                else:
+                    negocio_list = ['Consolidado']
+                
+                heatmap_data = []
+                
+                for negocio in negocio_list:
+                    for cohort in cohorts:
+                        if separar_por_negocio:
+                            pred_cohort = pred_data[
+                                (pred_data['Negocio'] == negocio) & 
+                                (pred_data['Cohort_Act'] == cohort)
+                            ]['Valor'].first()
+                            real_cohort = real_data[
+                                (real_data['Negocio'] == negocio) & 
+                                (real_data['Cohort_Act'] == cohort)
+                            ]['Valor'].first()
+                        else:
+                            pred_cohort = pred_data[pred_data['Cohort_Act'] == cohort]['Valor'].first()
+                            real_cohort = real_data[real_data['Cohort_Act'] == cohort]['Valor'].first()
+                        
+                        if not pd.isna(pred_cohort) and not pd.isna(real_cohort) and pred_cohort > 0:
+                            deviation = (real_cohort - pred_cohort) * 100  # En pp
+                            heatmap_data.append({
+                                'Negocio': negocio,
+                                'Cohort': str(cohort),
+                                'Desviación (pp)': deviation
+                            })
+                
+                if heatmap_data:
+                    df = pd.DataFrame(heatmap_data)
+                    
+                    # Crear pivot table
+                    pivot_df = df.pivot(index='Negocio', columns='Cohort', values='Desviación (pp)')
+                    
+                    fig = px.imshow(
+                        pivot_df.values,
+                        x=pivot_df.columns,
+                        y=pivot_df.index,
+                        color_continuous_scale='RdBu',
+                        title="Heatmap de Desviaciones Rate All In (pp)",
+                        labels=dict(x="Cohort", y="Negocio", color="Desviación (pp)")
+                    )
+                    
+                    fig.update_layout(height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+            
+        except Exception as e:
+            st.info("No se pudieron generar los datos para el heatmap.")
+    
+    def _create_rolling_trends_chart(self, elaboracion_prediccion, elaboracion_realidad, periodo, negocios):
+        """Crear gráfico de tendencias por negocio"""
+        try:
+            import plotly.graph_objects as go
+            from plotly.subplots import make_subplots
+            import pandas as pd
+            
+            # Crear subplots
+            fig = make_subplots(
+                rows=2, cols=2,
+                subplot_titles=('Rate All In por Negocio', 'Originacion Prom por Negocio', 
+                              'Risk Rate por Negocio', 'Fund Rate por Negocio'),
+                specs=[[{"secondary_y": False}, {"secondary_y": False}],
+                       [{"secondary_y": False}, {"secondary_y": False}]]
+            )
+            
+            variables = [
+                ('Rate All In', 1, 1),
+                ('Originacion Prom', 1, 2),
+                ('Risk Rate', 2, 1),
+                ('Fund Rate', 2, 2)
+            ]
+            
+            for variable, row, col in variables:
+                pred_values = []
+                real_values = []
+                negocio_names = []
+                
+                for negocio in negocios:
+                    if variable in ['Rate All In', 'Risk Rate', 'Fund Rate']:
+                        pred_data = self.df[
+                            (self.df['Elaboracion'] == elaboracion_prediccion) & 
+                            (self.df['Periodo'] == periodo) & 
+                            (self.df['Concepto'] == variable) &
+                            (self.df['Negocio'] == negocio)
+                        ].groupby('Cohort_Act')['Valor'].first().mean()
+                        
+                        real_data = self.df[
+                            (self.df['Elaboracion'] == elaboracion_realidad) & 
+                            (self.df['Periodo'] == periodo) & 
+                            (self.df['Concepto'] == variable) &
+                            (self.df['Negocio'] == negocio)
+                        ].groupby('Cohort_Act')['Valor'].first().mean()
+                        
+                        if not pd.isna(pred_data) and not pd.isna(real_data):
+                            pred_values.append(pred_data * 100 if variable != 'Term' else pred_data)
+                            real_values.append(real_data * 100 if variable != 'Term' else real_data)
+                            negocio_names.append(negocio)
+                    else:
+                        pred_data = self.df[
+                            (self.df['Elaboracion'] == elaboracion_prediccion) & 
+                            (self.df['Periodo'] == periodo) & 
+                            (self.df['Concepto'] == variable) &
+                            (self.df['Negocio'] == negocio)
+                        ]['Valor'].sum() / 1_000_000
+                        
+                        real_data = self.df[
+                            (self.df['Elaboracion'] == elaboracion_realidad) & 
+                            (self.df['Periodo'] == periodo) & 
+                            (self.df['Concepto'] == variable) &
+                            (self.df['Negocio'] == negocio)
+                        ]['Valor'].sum() / 1_000_000
+                        
+                        if not pd.isna(pred_data) and not pd.isna(real_data):
+                            pred_values.append(pred_data)
+                            real_values.append(real_data)
+                            negocio_names.append(negocio)
+                
+                if pred_values and real_values:
+                    fig.add_trace(
+                        go.Bar(name='Predicción', x=negocio_names, y=pred_values, 
+                               marker_color='#3498db', showlegend=(row==1 and col==1)),
+                        row=row, col=col
+                    )
+                    fig.add_trace(
+                        go.Bar(name='Realidad', x=negocio_names, y=real_values, 
+                               marker_color='#e74c3c', showlegend=(row==1 and col==1)),
+                        row=row, col=col
+                    )
+            
+            fig.update_layout(
+                title="Tendencias por Segmento de Negocio",
+                height=600,
+                showlegend=True
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+        except Exception as e:
+            st.info("No se pudieron generar los datos para el gráfico de tendencias.")
     
     def analyze_last_months_performance(self, query: str) -> str:
         """Análisis de rendimiento de los últimos N meses"""
