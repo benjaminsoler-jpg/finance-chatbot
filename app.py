@@ -3569,58 +3569,55 @@ def main():
             if message["role"] == "user":
                 st.markdown(f'<div class="chat-message user-message">👤 **Tú:** {message["content"]}</div>', unsafe_allow_html=True)
             else:
-                # Convertir saltos de línea a <br> para HTML
-                content_html = message["content"].replace('\n', '<br>')
-                st.markdown(f'<div class="chat-message bot-message">🤖 **Bot:** {content_html}</div>', unsafe_allow_html=True)
-    
-    # Generar gráficos rolling si están en session_state
-    if 'generate_rolling_charts' in st.session_state:
-        params = st.session_state.generate_rolling_charts
-        st.markdown("---")
-        st.markdown("## 📊 **VISUALIZACIONES INTERACTIVAS**")
-        
-        # 1. Gráfico de comparación
-        st.markdown("### 📈 **Gráfico 1: Comparación Predicción vs Realidad por Variable**")
-        chatbot._create_rolling_comparison_chart(
-            params['elaboracion_prediccion'], 
-            params['elaboracion_realidad'], 
-            params['periodo'], 
-            params['separar_por_negocio'], 
-            params['negocios']
-        )
-        
-        # 2. Gráfico de precisión
-        st.markdown("### 🎯 **Gráfico 2: Precisión Predictiva por Segmento**")
-        chatbot._create_rolling_accuracy_chart(
-            params['elaboracion_prediccion'], 
-            params['elaboracion_realidad'], 
-            params['periodo'], 
-            params['separar_por_negocio'], 
-            params['negocios']
-        )
-        
-        # 3. Heatmap
-        st.markdown("### 🔥 **Gráfico 3: Heatmap de Desviaciones por Cohort**")
-        chatbot._create_rolling_heatmap_chart(
-            params['elaboracion_prediccion'], 
-            params['elaboracion_realidad'], 
-            params['periodo'], 
-            params['separar_por_negocio'], 
-            params['negocios']
-        )
-        
-        # 4. Gráfico de tendencias (solo si separar por negocio)
-        if params['separar_por_negocio']:
-            st.markdown("### 📊 **Gráfico 4: Tendencias por Segmento de Negocio**")
-            chatbot._create_rolling_trends_chart(
-                params['elaboracion_prediccion'], 
-                params['elaboracion_realidad'], 
-                params['periodo'], 
-                params['negocios']
-            )
-        
-        # Limpiar session_state
-        del st.session_state.generate_rolling_charts
+                # Verificar si es un mensaje con gráficos
+                if message["content"] == "CHARTS_ROLLING" and "chart_params" in message:
+                    params = message["chart_params"]
+                    st.markdown("---")
+                    st.markdown("## 📊 **VISUALIZACIONES INTERACTIVAS**")
+                    
+                    # 1. Gráfico de comparación
+                    st.markdown("### 📈 **Gráfico 1: Comparación Predicción vs Realidad por Variable**")
+                    chatbot._create_rolling_comparison_chart(
+                        params['elaboracion_prediccion'], 
+                        params['elaboracion_realidad'], 
+                        params['periodo'], 
+                        params['separar_por_negocio'], 
+                        params['negocios']
+                    )
+                    
+                    # 2. Gráfico de precisión
+                    st.markdown("### 🎯 **Gráfico 2: Precisión Predictiva por Segmento**")
+                    chatbot._create_rolling_accuracy_chart(
+                        params['elaboracion_prediccion'], 
+                        params['elaboracion_realidad'], 
+                        params['periodo'], 
+                        params['separar_por_negocio'], 
+                        params['negocios']
+                    )
+                    
+                    # 3. Heatmap
+                    st.markdown("### 🔥 **Gráfico 3: Heatmap de Desviaciones por Cohort**")
+                    chatbot._create_rolling_heatmap_chart(
+                        params['elaboracion_prediccion'], 
+                        params['elaboracion_realidad'], 
+                        params['periodo'], 
+                        params['separar_por_negocio'], 
+                        params['negocios']
+                    )
+                    
+                    # 4. Gráfico de tendencias (solo si separar por negocio)
+                    if params['separar_por_negocio']:
+                        st.markdown("### 📊 **Gráfico 4: Tendencias por Segmento de Negocio**")
+                        chatbot._create_rolling_trends_chart(
+                            params['elaboracion_prediccion'], 
+                            params['elaboracion_realidad'], 
+                            params['periodo'], 
+                            params['negocios']
+                        )
+                else:
+                    # Convertir saltos de línea a <br> para HTML
+                    content_html = message["content"].replace('\n', '<br>')
+                    st.markdown(f'<div class="chat-message bot-message">🤖 **Bot:** {content_html}</div>', unsafe_allow_html=True)
     
     # Input de usuario
     user_input = st.text_input("Escribe tu consulta:", key="user_input")
@@ -3632,9 +3629,6 @@ def main():
         # Obtener respuesta
         with st.spinner("Procesando..."):
             response = chatbot.get_chat_response(user_input)
-        
-        # Agregar respuesta del bot
-        st.session_state.messages.append({"role": "assistant", "content": response})
         
         # Detectar si se deben generar gráficos rolling
         if "**GENERATE_ROLLING_CHARTS:**" in response:
@@ -3654,9 +3648,24 @@ def main():
                         value = False
                     params[key] = value
             
-            # Generar gráficos
+            # Generar gráficos y agregar al mensaje
             if all(k in params for k in ['elaboracion_prediccion', 'elaboracion_realidad', 'periodo', 'separar_por_negocio', 'negocios']):
-                st.session_state.generate_rolling_charts = params
+                # Limpiar el marcador de la respuesta
+                clean_response = response.split("**GENERATE_ROLLING_CHARTS:**")[0].strip()
+                
+                # Agregar mensaje limpio
+                st.session_state.messages.append({"role": "assistant", "content": clean_response})
+                
+                # Agregar gráficos como mensaje especial
+                st.session_state.messages.append({
+                    "role": "assistant", 
+                    "content": "CHARTS_ROLLING",
+                    "chart_params": params
+                })
+            else:
+                st.session_state.messages.append({"role": "assistant", "content": response})
+        else:
+            st.session_state.messages.append({"role": "assistant", "content": response})
         
         # Recargar la página para mostrar la respuesta
         st.rerun()
