@@ -415,6 +415,9 @@ class FinancialChatbot:
         # Variables clave para análisis
         variables_clave = ['Rate All In', 'Originacion Prom', 'Term', 'Risk Rate', 'Fund Rate']
         
+        # Variables que son rates (porcentajes)
+        rate_variables = ['Rate All In', 'Risk Rate', 'Fund Rate']
+        
         for variable in variables_clave:
             analysis += f"📈 **{variable}:**\n"
             
@@ -436,7 +439,12 @@ class FinancialChatbot:
                 if len(data) > 0:
                     valor = data['Valor'].sum()
                     valores_por_periodo.append(valor)
-                    analysis += f"  - {periodo}: ${valor:,}\n"
+                    
+                    # Formatear según el tipo de variable
+                    if variable in rate_variables:
+                        analysis += f"  - {periodo}: {valor:.2f}%\n"
+                    else:
+                        analysis += f"  - {periodo}: ${valor:,}\n"
                 else:
                     analysis += f"  - {periodo}: Sin datos\n"
             
@@ -456,7 +464,10 @@ class FinancialChatbot:
                     else:
                         tendencia = "➡️ Estable"
                     
-                    analysis += f"  **Tendencia:** {tendencia} ({porcentaje:+.1f}%)\n"
+                    if variable in rate_variables:
+                        analysis += f"  **Tendencia:** {tendencia} ({porcentaje:+.1f} puntos porcentuales)\n"
+                    else:
+                        analysis += f"  **Tendencia:** {tendencia} ({porcentaje:+.1f}%)\n"
             
             analysis += "\n"
         
