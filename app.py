@@ -568,7 +568,7 @@ class FinancialChatbot:
         return analysis
     
     def _analyze_rate_variable(self, variable, elaboracion, periodos, escenario, negocios):
-        """Análisis automático para variables de rate (porcentajes)"""
+        """Análisis automático para variables de rate (porcentajes) - Comparativo entre períodos"""
         analysis = ""
         
         # Obtener datos para todos los negocios
@@ -606,39 +606,87 @@ class FinancialChatbot:
         # Convertir a DataFrame para análisis
         df_analysis = pd.DataFrame(all_data)
         
-        # Análisis por negocio
-        negocio_stats = df_analysis.groupby('negocio')['valor'].agg(['mean', 'min', 'max', 'std']).round(2)
+        # Análisis comparativo por período
+        periodo_stats = df_analysis.groupby('periodo')['valor'].agg(['mean', 'count']).round(2)
+        periodos_ordenados = sorted(periodo_stats.index)
         
-        analysis += "  📈 **Por Negocio:**\n"
-        for negocio in negocio_stats.index:
-            stats = negocio_stats.loc[negocio]
-            analysis += f"    • {negocio}: Promedio {stats['mean']:.2f}% (Rango: {stats['min']:.2f}% - {stats['max']:.2f}%)\n"
+        analysis += "  📅 **Comparación por Período:**\n"
+        for i, periodo in enumerate(periodos_ordenados):
+            stats = periodo_stats.loc[periodo]
+            analysis += f"    • {periodo}: Promedio {stats['mean']:.2f}% ({stats['count']} registros)\n"
+            
+            # Comparar con período anterior
+            if i > 0:
+                periodo_anterior = periodos_ordenados[i-1]
+                valor_anterior = periodo_stats.loc[periodo_anterior, 'mean']
+                valor_actual = stats['mean']
+                cambio = valor_actual - valor_anterior
+                porcentaje = (cambio / valor_anterior * 100) if valor_anterior != 0 else 0
+                
+                if cambio > 0:
+                    emoji = "📈"
+                    tendencia = "subió"
+                elif cambio < 0:
+                    emoji = "📉"
+                    tendencia = "bajó"
+                else:
+                    emoji = "➡️"
+                    tendencia = "se mantuvo"
+                
+                analysis += f"      {emoji} vs {periodo_anterior}: {tendencia} {abs(cambio):.2f}pp ({abs(porcentaje):.1f}%)\n"
         
-        # Análisis por cohort
-        cohort_stats = df_analysis.groupby('cohort')['valor'].agg(['mean', 'count']).round(2)
-        analysis += "  📊 **Por Cohort:**\n"
-        for cohort in cohort_stats.index:
-            stats = cohort_stats.loc[cohort]
-            analysis += f"    • {cohort}: Promedio {stats['mean']:.2f}% ({stats['count']} registros)\n"
+        # Análisis por negocio - comparación entre períodos
+        analysis += "  🏢 **Análisis por Negocio:**\n"
+        for negocio in negocios:
+            negocio_data = df_analysis[df_analysis['negocio'] == negocio]
+            if len(negocio_data) > 0:
+                negocio_periodo = negocio_data.groupby('periodo')['valor'].mean().round(2)
+                if len(negocio_periodo) > 1:
+                    primer_periodo = negocio_periodo.iloc[0]
+                    ultimo_periodo = negocio_periodo.iloc[-1]
+                    cambio = ultimo_periodo - primer_periodo
+                    porcentaje = (cambio / primer_periodo * 100) if primer_periodo != 0 else 0
+                    
+                    if cambio > 0:
+                        emoji = "📈"
+                        tendencia = "creció"
+                    elif cambio < 0:
+                        emoji = "📉"
+                        tendencia = "decreció"
+                    else:
+                        emoji = "➡️"
+                        tendencia = "se mantuvo"
+                    
+                    analysis += f"    • {negocio}: {emoji} {tendencia} {abs(cambio):.2f}pp ({abs(porcentaje):.1f}%)\n"
         
-        # Análisis de tendencia temporal
-        periodo_stats = df_analysis.groupby('periodo')['valor'].mean().round(2)
-        if len(periodo_stats) > 1:
-            primer_valor = periodo_stats.iloc[0]
-            ultimo_valor = periodo_stats.iloc[-1]
-            cambio = ultimo_valor - primer_valor
-            if cambio > 0:
-                tendencia = "📈 Creciendo"
-            elif cambio < 0:
-                tendencia = "📉 Decreciendo"
-            else:
-                tendencia = "➡️ Estable"
-            analysis += f"  📅 **Tendencia Temporal:** {tendencia} ({cambio:+.2f} puntos porcentuales)\n"
+        # Análisis por cohort - comparación entre períodos
+        analysis += "  📊 **Análisis por Cohort:**\n"
+        for cohort in df_analysis['cohort'].unique():
+            cohort_data = df_analysis[df_analysis['cohort'] == cohort]
+            if len(cohort_data) > 0:
+                cohort_periodo = cohort_data.groupby('periodo')['valor'].mean().round(2)
+                if len(cohort_periodo) > 1:
+                    primer_periodo = cohort_periodo.iloc[0]
+                    ultimo_periodo = cohort_periodo.iloc[-1]
+                    cambio = ultimo_periodo - primer_periodo
+                    porcentaje = (cambio / primer_periodo * 100) if primer_periodo != 0 else 0
+                    
+                    if cambio > 0:
+                        emoji = "📈"
+                        tendencia = "creció"
+                    elif cambio < 0:
+                        emoji = "📉"
+                        tendencia = "decreció"
+                    else:
+                        emoji = "➡️"
+                        tendencia = "se mantuvo"
+                    
+                    analysis += f"    • {cohort}: {emoji} {tendencia} {abs(cambio):.2f}pp ({abs(porcentaje):.1f}%)\n"
         
         return analysis
     
     def _analyze_monetary_variable(self, variable, elaboracion, periodos, escenario, negocios):
-        """Análisis automático para variables monetarias"""
+        """Análisis automático para variables monetarias - Comparativo entre períodos"""
         analysis = ""
         
         # Obtener datos para todos los negocios
@@ -670,39 +718,71 @@ class FinancialChatbot:
         # Convertir a DataFrame para análisis
         df_analysis = pd.DataFrame(all_data)
         
-        # Análisis por negocio
-        negocio_stats = df_analysis.groupby('negocio')['valor'].agg(['sum', 'mean']).round(0)
-        total_general = negocio_stats['sum'].sum()
-        
-        analysis += "  💰 **Por Negocio:**\n"
-        for negocio in negocio_stats.index:
-            stats = negocio_stats.loc[negocio]
-            porcentaje = (stats['sum'] / total_general * 100) if total_general > 0 else 0
-            analysis += f"    • {negocio}: ${stats['sum']:,.0f} ({porcentaje:.1f}% del total)\n"
-        
-        # Análisis de tendencia temporal
+        # Análisis comparativo por período
         periodo_stats = df_analysis.groupby('periodo')['valor'].sum().round(0)
-        if len(periodo_stats) > 1:
-            primer_valor = periodo_stats.iloc[0]
-            ultimo_valor = periodo_stats.iloc[-1]
-            cambio = ultimo_valor - primer_valor
-            porcentaje = (cambio / primer_valor * 100) if primer_valor != 0 else 0
-            if cambio > 0:
-                tendencia = "📈 Creciendo"
-            elif cambio < 0:
-                tendencia = "📉 Decreciendo"
-            else:
-                tendencia = "➡️ Estable"
-            analysis += f"  📅 **Tendencia Temporal:** {tendencia} ({cambio:+,.0f} / {porcentaje:+.1f}%)\n"
+        periodos_ordenados = sorted(periodo_stats.index)
         
-        # Análisis de concentración
+        analysis += "  📅 **Comparación por Período:**\n"
+        for i, periodo in enumerate(periodos_ordenados):
+            valor = periodo_stats.loc[periodo]
+            analysis += f"    • {periodo}: ${valor:,.0f}\n"
+            
+            # Comparar con período anterior
+            if i > 0:
+                periodo_anterior = periodos_ordenados[i-1]
+                valor_anterior = periodo_stats.loc[periodo_anterior]
+                valor_actual = valor
+                cambio = valor_actual - valor_anterior
+                porcentaje = (cambio / valor_anterior * 100) if valor_anterior != 0 else 0
+                
+                if cambio > 0:
+                    emoji = "📈"
+                    tendencia = "subió"
+                elif cambio < 0:
+                    emoji = "📉"
+                    tendencia = "bajó"
+                else:
+                    emoji = "➡️"
+                    tendencia = "se mantuvo"
+                
+                analysis += f"      {emoji} vs {periodo_anterior}: {tendencia} ${abs(cambio):,.0f} ({abs(porcentaje):.1f}%)\n"
+        
+        # Análisis por negocio - comparación entre períodos
+        analysis += "  🏢 **Análisis por Negocio:**\n"
+        for negocio in negocios:
+            negocio_data = df_analysis[df_analysis['negocio'] == negocio]
+            if len(negocio_data) > 0:
+                negocio_periodo = negocio_data.groupby('periodo')['valor'].sum().round(0)
+                if len(negocio_periodo) > 1:
+                    primer_periodo = negocio_periodo.iloc[0]
+                    ultimo_periodo = negocio_periodo.iloc[-1]
+                    cambio = ultimo_periodo - primer_periodo
+                    porcentaje = (cambio / primer_periodo * 100) if primer_periodo != 0 else 0
+                    
+                    if cambio > 0:
+                        emoji = "📈"
+                        tendencia = "creció"
+                    elif cambio < 0:
+                        emoji = "📉"
+                        tendencia = "decreció"
+                    else:
+                        emoji = "➡️"
+                        tendencia = "se mantuvo"
+                    
+                    analysis += f"    • {negocio}: {emoji} {tendencia} ${abs(cambio):,.0f} ({abs(porcentaje):.1f}%)\n"
+        
+        # Análisis de concentración por período
         if variable == 'Originacion Prom':
-            analysis += "  🎯 **Concentración:** "
-            if negocio_stats['sum'].max() / total_general > 0.5:
-                negocio_dominante = negocio_stats['sum'].idxmax()
-                analysis += f"{negocio_dominante} domina el mercado ({negocio_stats.loc[negocio_dominante, 'sum']/total_general*100:.1f}%)\n"
-            else:
-                analysis += "Mercado diversificado entre negocios\n"
+            analysis += "  🎯 **Concentración por Período:**\n"
+            for periodo in periodos_ordenados:
+                periodo_data = df_analysis[df_analysis['periodo'] == periodo]
+                negocio_periodo = periodo_data.groupby('negocio')['valor'].sum().round(0)
+                total_periodo = negocio_periodo.sum()
+                
+                if total_periodo > 0:
+                    negocio_dominante = negocio_periodo.idxmax()
+                    porcentaje_dominante = (negocio_periodo.max() / total_periodo * 100)
+                    analysis += f"    • {periodo}: {negocio_dominante} lidera ({porcentaje_dominante:.1f}%)\n"
         
         return analysis
     
