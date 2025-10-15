@@ -271,7 +271,7 @@ class FinancialChatbot:
         import re
         
         # Extraer elaboración de la consulta
-        elaboracion_match = re.search(r'elaboracion\s+(\d{2})-01-2025', query.lower())
+        elaboracion_match = re.search(r'elaboraci[oó]n\s+(\d{2})-01-2025', query.lower())
         if not elaboracion_match:
             return None
         
@@ -376,7 +376,7 @@ class FinancialChatbot:
         import re
         
         # Extraer elaboración y cantidad de meses
-        elaboracion_match = re.search(r'elaboracion\s+(\d{2})-01-2025', query.lower())
+        elaboracion_match = re.search(r'elaboraci[oó]n\s+(\d{2})-01-2025', query.lower())
         meses_match = re.search(r'ultimos?\s+(\d+)\s+meses?', query.lower())
         
         if not elaboracion_match:
