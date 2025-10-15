@@ -408,8 +408,28 @@ class FinancialChatbot:
                 return None
             
             periodo = periodo1
-            elaboracion_realidad = elaboracion1
-            elaboracion_prediccion = elaboracion2
+            
+            # Determinar cuál es predicción y cuál es realidad
+            mes_elaboracion1 = int(elaboracion1.split('-')[0])
+            mes_elaboracion2 = int(elaboracion2.split('-')[0])
+            mes_periodo = int(periodo.split('-')[0])
+            
+            # Si elaboración = período, es predicción (rolling predictivo)
+            # Si elaboración > período, es realidad (datos históricos)
+            if mes_elaboracion1 == mes_periodo:
+                elaboracion_prediccion = elaboracion1
+                elaboracion_realidad = elaboracion2
+            elif mes_elaboracion2 == mes_periodo:
+                elaboracion_prediccion = elaboracion2
+                elaboracion_realidad = elaboracion1
+            else:
+                # Si ninguna coincide exactamente, usar la más cercana
+                if abs(mes_elaboracion1 - mes_periodo) < abs(mes_elaboracion2 - mes_periodo):
+                    elaboracion_prediccion = elaboracion1
+                    elaboracion_realidad = elaboracion2
+                else:
+                    elaboracion_prediccion = elaboracion2
+                    elaboracion_realidad = elaboracion1
             
         elif match2:
             # Patrón 2
@@ -421,6 +441,17 @@ class FinancialChatbot:
             # Verificar que ambos períodos sean iguales
             if periodo != periodo_verificacion:
                 return None
+            
+            # Verificar que la lógica sea correcta:
+            # elaboracion_realidad > periodo (datos históricos)
+            # elaboracion_prediccion <= periodo (predicción)
+            mes_elaboracion_realidad = int(elaboracion_realidad.split('-')[0])
+            mes_elaboracion_prediccion = int(elaboracion_prediccion.split('-')[0])
+            mes_periodo = int(periodo.split('-')[0])
+            
+            if mes_elaboracion_realidad <= mes_periodo or mes_elaboracion_prediccion > mes_periodo:
+                # Intercambiar si la lógica está invertida
+                elaboracion_realidad, elaboracion_prediccion = elaboracion_prediccion, elaboracion_realidad
                 
         else:
             return None
