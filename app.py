@@ -249,6 +249,22 @@ class FinancialChatbot:
         
         return analysis
     
+    def is_financial_query(self, query: str) -> bool:
+        """Detectar si la consulta es financiera o general"""
+        financial_keywords = [
+            'originacion', 'originación', 'gross revenue', 'margen financiero',
+            'resultado comercial', 'churn', 'clientes', 'ad rate', 'ad revenue',
+            'cost of fund', 'cost of risk', 'fund rate', 'int rate', 'interest revenue',
+            'ntr', 'rate all in', 'risk rate', 'spread', 'term', 'elaboracion', 'elaboración',
+            'periodo', 'período', 'negocio', 'concepto', 'clasificación', 'cohort',
+            'escenario', 'pais', 'país', 'valor', 'análisis', 'analisis', 'datos',
+            'financiero', 'financiera', 'comercial', 'ventas', 'ingresos', 'costos',
+            'margen', 'rentabilidad', 'inversión', 'inversion'
+        ]
+        
+        query_lower = query.lower()
+        return any(keyword in query_lower for keyword in financial_keywords)
+    
     def generate_analysis(self, query, df, filters):
         """Generar análisis basado en la consulta y filtros"""
         query_lower = query.lower()
@@ -498,20 +514,30 @@ class FinancialChatbot:
     
     def get_chat_response(self, user_message: str) -> str:
         """Obtener respuesta del chatbot"""
-        # Primero intentar análisis de datos
-        data_analysis = self.analyze_data(user_message)
-        if data_analysis:
-            return data_analysis
+        # Detectar si es una consulta financiera
+        is_financial = self.is_financial_query(user_message)
         
-        # Si no hay análisis de datos, usar OpenAI
+        # Si es financiera, intentar análisis de datos primero
+        if is_financial:
+            data_analysis = self.analyze_data(user_message)
+            if data_analysis and "No hay datos disponibles" not in data_analysis:
+                return data_analysis
+        
+        # Para consultas generales o si no hay datos financieros, usar OpenAI
         if not hasattr(self, 'openai_available') or not self.openai_available:
-            return "Solo análisis de datos disponible. Configura OpenAI API Key para consultas generales."
+            if is_financial:
+                return "Solo análisis de datos disponible. Configura OpenAI API Key para consultas generales."
+            else:
+                return "Configura OpenAI API Key para consultas generales."
         
         try:
+            # Usar el prompt apropiado según el tipo de consulta
+            system_prompt = "Eres un asistente inteligente y versátil. Para preguntas financieras, análisis de datos y temas de negocio, eres un experto serio y profesional que proporciona información precisa y detallada. Para preguntas cotidianas, conversaciones casuales o temas generales, eres amigable, conversacional y como un buen amigo. Adapta tu tono según el contexto: serio para finanzas, casual y amigable para todo lo demás."
+            
             response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "Eres un asistente financiero experto. Ayudas con consultas sobre finanzas, inversiones y análisis de datos financieros."},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
                 max_tokens=1000,
