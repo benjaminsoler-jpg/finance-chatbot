@@ -111,12 +111,24 @@ class FinancialChatbot:
             
             # Detectar si el valor ya está en formato porcentaje (contiene %)
             def convert_percentage(value_str):
-                if '%' in str(value_str):
+                value_str = str(value_str).strip()
+                
+                # Manejar casos especiales
+                if value_str in ['#DIV/0!', '#VALUE!', '#N/A', 'N/A', '', 'nan', 'NaN']:
+                    return 0.0
+                
+                if '%' in value_str:
                     # Si tiene %, convertir de porcentaje a decimal
-                    return float(str(value_str).replace('%', '')) / 100
+                    try:
+                        return float(value_str.replace('%', '')) / 100
+                    except ValueError:
+                        return 0.0
                 else:
                     # Si no tiene %, convertir directamente
-                    return float(value_str)
+                    try:
+                        return float(value_str)
+                    except ValueError:
+                        return 0.0
             
             self.df['Valor'] = self.df['Valor'].apply(convert_percentage)
             self.df['Valor'] = pd.to_numeric(self.df['Valor'], errors='coerce').fillna(0)
