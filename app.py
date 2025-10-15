@@ -743,18 +743,18 @@ class FinancialChatbot:
         
         # Si es financiera, intentar análisis especializados primero
         if is_financial:
-            # Verificar si es una consulta de "como nos fue" (comparación)
+            # Verificar si es una consulta de "últimos N meses" (PRIORIDAD ALTA)
+            if 'ultimos' in user_message.lower() and 'meses' in user_message.lower():
+                months_analysis = self.analyze_last_months_performance(user_message)
+                if months_analysis:
+                    return months_analysis
+            
+            # Verificar si es una consulta de "como nos fue" (comparación) - PRIORIDAD BAJA
             if 'como nos fue' in user_message.lower() or 'como me fue' in user_message.lower():
                 if 'elaboracion' in user_message.lower():
                     comparison_analysis = self.analyze_performance_comparison(user_message)
                     if comparison_analysis:
                         return comparison_analysis
-            
-            # Verificar si es una consulta de "últimos N meses"
-            if ('ultimos' in user_message.lower() or 'ultimo' in user_message.lower()) and 'meses' in user_message.lower():
-                months_analysis = self.analyze_last_months_performance(user_message)
-                if months_analysis:
-                    return months_analysis
             
             # Análisis de datos estándar
             data_analysis = self.analyze_data(user_message)
