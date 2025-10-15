@@ -2029,6 +2029,17 @@ def main():
         st.write("• 'Valor total por concepto'")
         st.write("• 'Distribución por negocio'")
         st.write("• 'Tendencia por período'")
+        
+        st.header("📈 Dashboard Rápido")
+        if st.button("🔍 Análisis Completo de Últimos 3 Meses"):
+            st.session_state.messages.append({"role": "user", "content": "¿Cómo me fue en los últimos 3 meses de elaboración 08-01-2025?"})
+            st.rerun()
+        if st.button("🚨 Detectar Anomalías"):
+            st.session_state.messages.append({"role": "user", "content": "Detecta anomalías en los últimos 3 meses de elaboración 08-01-2025"})
+            st.rerun()
+        if st.button("📊 Visualizar Tendencias"):
+            st.session_state.messages.append({"role": "user", "content": "Muestra las tendencias de Rate All In en los últimos 3 meses"})
+            st.rerun()
     
     # Chat interface
     st.header("💬 Chat")
