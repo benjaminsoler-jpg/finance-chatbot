@@ -54,6 +54,12 @@ st.markdown("""
         margin: 15px 0 10px 0;
         color: #2E86AB;
     }
+    .variable-title {
+        font-size: 1.2em;
+        font-weight: bold;
+        margin: 5px 0;
+        color: #E63946;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -838,7 +844,7 @@ class FinancialChatbot:
         # Cambios más importantes
         storytelling += "🔥 **CAMBIOS MÁS IMPORTANTES (Último vs Primer Período):**\n"
         for i, cambio in enumerate(cambios_significativos[:5]):  # Top 5
-            storytelling += f"{i+1}. **{cambio['variable']}** en {cambio['negocio']}: "
+            storytelling += f"{i+1}. <div class='variable-title'>**{cambio['variable']}**</div> en <div class='business-title'>**{cambio['negocio']}**</div>: "
             if cambio['tipo'] == 'rate':
                 storytelling += f"{cambio['emoji']} {cambio['tendencia']} {abs(cambio['magnitud']):.2f}pp ({abs(cambio['porcentaje']):.1f}%)\n"
             else:
@@ -853,11 +859,11 @@ class FinancialChatbot:
             if negocio_cambios:
                 # Tomar solo el cambio más significativo por negocio
                 cambio_principal = max(negocio_cambios, key=lambda x: abs(x['magnitud']))
-                storytelling += f"\n**{negocio}:**\n"
+                storytelling += f"\n<div class='business-title'>**{negocio}:**</div>\n"
                 if cambio_principal['tipo'] == 'rate':
-                    storytelling += f"  • {cambio_principal['variable']}: {cambio_principal['emoji']} {cambio_principal['tendencia']} {abs(cambio_principal['magnitud']):.2f}pp\n"
+                    storytelling += f"  • <div class='variable-title'>**{cambio_principal['variable']}**</div>: {cambio_principal['emoji']} {cambio_principal['tendencia']} {abs(cambio_principal['magnitud']):.2f}pp\n"
                 else:
-                    storytelling += f"  • {cambio_principal['variable']}: {cambio_principal['emoji']} {cambio_principal['tendencia']} ${abs(cambio_principal['magnitud']):,.0f}\n"
+                    storytelling += f"  • <div class='variable-title'>**{cambio_principal['variable']}**</div>: {cambio_principal['emoji']} {cambio_principal['tendencia']} ${abs(cambio_principal['magnitud']):,.0f}\n"
         
         storytelling += "\n"
         
