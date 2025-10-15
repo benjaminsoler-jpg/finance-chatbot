@@ -11,6 +11,7 @@ import os
 from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
+import numpy as np
 
 # Configuración de la página
 st.set_page_config(
@@ -561,6 +562,9 @@ class FinancialChatbot:
         
         # Visualizaciones interactivas
         analysis += self.generate_visualizations(cambios_significativos, elaboracion, periodos, escenario)
+        
+        # Detección de anomalías
+        analysis += self.detect_anomalies(elaboracion, periodos, escenario, negocios)
         
         # Si se menciona "Resultado Comercial", agregar análisis por negocio
         if 'resultado comercial' in query.lower():
@@ -1128,6 +1132,149 @@ class FinancialChatbot:
         fig.update_layout(height=400)
         
         return f"**Gráfico 4: Heatmap de Cambios**\n{fig.to_html(include_plotlyjs='cdn', div_id='heatmap')}\n\n"
+    
+    def detect_anomalies(self, elaboracion, periodos, escenario, negocios):
+        """Detectar anomalías y outliers en los datos financieros"""
+        anomalies = "🚨 **DETECCIÓN DE ANOMALÍAS:**\n\n"
+        
+        # Variables clave para análisis de anomalías
+        variables_clave = ['Rate All In', 'New Active', 'Churn Bruto', 'Resucitados', 'Originacion Prom', 'Term', 'Risk Rate', 'Fund Rate']
+        rate_variables = ['Rate All In', 'Risk Rate', 'Fund Rate', 'Term']
+        
+        anomalies_detected = []
+        
+        for variable in variables_clave:
+            if variable in rate_variables:
+                # Análisis de anomalías para rates
+                var_anomalies = self._detect_rate_anomalies(variable, elaboracion, periodos, escenario, negocios)
+                if var_anomalies:
+                    anomalies_detected.extend(var_anomalies)
+            else:
+                # Análisis de anomalías para variables monetarias
+                var_anomalies = self._detect_monetary_anomalies(variable, elaboracion, periodos, escenario, negocios)
+                if var_anomalies:
+                    anomalies_detected.extend(var_anomalies)
+        
+        if not anomalies_detected:
+            anomalies += "✅ **No se detectaron anomalías significativas** en el período analizado. Los datos muestran un comportamiento normal.\n\n"
+            return anomalies
+        
+        # Ordenar anomalías por severidad
+        anomalies_detected.sort(key=lambda x: x['severity_score'], reverse=True)
+        
+        # Mostrar top anomalías
+        anomalies += f"⚠️ **Se detectaron {len(anomalies_detected)} anomalías** que requieren atención:\n\n"
+        
+        for i, anomaly in enumerate(anomalies_detected[:5]):  # Top 5 anomalías
+            severity_emoji = "🔴" if anomaly['severity_score'] > 3 else "🟡" if anomaly['severity_score'] > 2 else "🟠"
+            anomalies += f"{i+1}. {severity_emoji} **{anomaly['variable']}** en **{anomaly['negocio']}**\n"
+            anomalies += f"   • **Período:** {anomaly['periodo']}\n"
+            anomalies += f"   • **Valor:** {anomaly['valor']:.2f}\n"
+            anomalies += f"   • **Desviación:** {anomaly['deviation']:.1f} desviaciones estándar\n"
+            anomalies += f"   • **Severidad:** {anomaly['severity']}\n"
+            anomalies += f"   • **Descripción:** {anomaly['description']}\n\n"
+        
+        # Recomendaciones para anomalías
+        anomalies += "💡 **RECOMENDACIONES:**\n"
+        anomalies += "• **Revisar datos de origen** para verificar la precisión de los valores anómalos\n"
+        anomalies += "• **Investigar causas raíz** de las desviaciones significativas\n"
+        anomalies += "• **Implementar alertas automáticas** para detectar futuras anomalías\n"
+        anomalies += "• **Validar procesos de carga** de datos para evitar errores\n\n"
+        
+        return anomalies
+    
+    def _detect_rate_anomalies(self, variable, elaboracion, periodos, escenario, negocios):
+        """Detectar anomalías en variables de rate"""
+        anomalies = []
+        
+        for negocio in negocios:
+            # Obtener valores históricos para calcular estadísticas
+            values = []
+            for periodo in periodos:
+                valor = self._get_rate_value(variable, elaboracion, periodo, escenario, negocio)
+                if valor is not None:
+                    values.append(valor)
+            
+            if len(values) < 2:
+                continue
+            
+            # Calcular estadísticas
+            mean_val = np.mean(values)
+            std_val = np.std(values)
+            
+            if std_val == 0:
+                continue
+            
+            # Detectar outliers (valores que se desvían más de 2 desviaciones estándar)
+            for i, valor in enumerate(values):
+                z_score = abs((valor - mean_val) / std_val)
+                
+                if z_score > 2.0:  # Umbral de anomalía
+                    severity_score = min(z_score, 5.0)  # Cap a 5
+                    severity = "Alta" if severity_score > 3 else "Media" if severity_score > 2 else "Baja"
+                    
+                    anomalies.append({
+                        'variable': variable,
+                        'negocio': negocio,
+                        'periodo': periodos[i],
+                        'valor': valor,
+                        'deviation': z_score,
+                        'severity_score': severity_score,
+                        'severity': severity,
+                        'description': f"Valor {valor:.2f}pp se desvía {z_score:.1f} desviaciones estándar del promedio {mean_val:.2f}pp"
+                    })
+        
+        return anomalies
+    
+    def _detect_monetary_anomalies(self, variable, elaboracion, periodos, escenario, negocios):
+        """Detectar anomalías en variables monetarias"""
+        anomalies = []
+        
+        for negocio in negocios:
+            # Obtener valores históricos para calcular estadísticas
+            values = []
+            for periodo in periodos:
+                valor = self._get_monetary_value(variable, elaboracion, periodo, escenario, negocio)
+                if valor is not None and valor > 0:
+                    values.append(valor)
+            
+            if len(values) < 2:
+                continue
+            
+            # Calcular estadísticas (usar log para variables monetarias)
+            log_values = [np.log(val) for val in values if val > 0]
+            
+            if len(log_values) < 2:
+                continue
+                
+            mean_log = np.mean(log_values)
+            std_log = np.std(log_values)
+            
+            if std_log == 0:
+                continue
+            
+            # Detectar outliers
+            for i, valor in enumerate(values):
+                if valor > 0:
+                    log_val = np.log(valor)
+                    z_score = abs((log_val - mean_log) / std_log)
+                    
+                    if z_score > 2.0:  # Umbral de anomalía
+                        severity_score = min(z_score, 5.0)  # Cap a 5
+                        severity = "Alta" if severity_score > 3 else "Media" if severity_score > 2 else "Baja"
+                        
+                        anomalies.append({
+                            'variable': variable,
+                            'negocio': negocio,
+                            'periodo': periodos[i],
+                            'valor': valor,
+                            'deviation': z_score,
+                            'severity_score': severity_score,
+                            'severity': severity,
+                            'description': f"Valor ${valor:,.0f} se desvía {z_score:.1f} desviaciones estándar del promedio logarítmico"
+                        })
+        
+        return anomalies
     
     def _analyze_originacion_prom(self, cambios):
         """Análisis experto de Originacion Prom"""
