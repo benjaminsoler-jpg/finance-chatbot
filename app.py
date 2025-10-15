@@ -836,7 +836,7 @@ class FinancialChatbot:
         storytelling += f"🎯 **ESCENARIO:** {escenario}\n\n"
         
         # Cambios más importantes
-        storytelling += "🔥 **CAMBIOS MÁS IMPORTANTES:**\n"
+        storytelling += "🔥 **CAMBIOS MÁS IMPORTANTES (Último vs Primer Período):**\n"
         for i, cambio in enumerate(cambios_significativos[:5]):  # Top 5
             storytelling += f"{i+1}. **{cambio['variable']}** en {cambio['negocio']}: "
             if cambio['tipo'] == 'rate':
@@ -846,17 +846,18 @@ class FinancialChatbot:
         
         storytelling += "\n"
         
-        # Análisis por negocio
+        # Análisis por negocio - solo un cambio por negocio
         storytelling += "🏢 **ANÁLISIS POR NEGOCIO:**\n"
         for negocio in negocios:
             negocio_cambios = [c for c in cambios_significativos if c['negocio'] == negocio]
             if negocio_cambios:
+                # Tomar solo el cambio más significativo por negocio
+                cambio_principal = max(negocio_cambios, key=lambda x: abs(x['magnitud']))
                 storytelling += f"\n**{negocio}:**\n"
-                for cambio in negocio_cambios[:3]:  # Top 3 por negocio
-                    if cambio['tipo'] == 'rate':
-                        storytelling += f"  • {cambio['variable']}: {cambio['emoji']} {cambio['tendencia']} {abs(cambio['magnitud']):.2f}pp\n"
-                    else:
-                        storytelling += f"  • {cambio['variable']}: {cambio['emoji']} {cambio['tendencia']} ${abs(cambio['magnitud']):,.0f}\n"
+                if cambio_principal['tipo'] == 'rate':
+                    storytelling += f"  • {cambio_principal['variable']}: {cambio_principal['emoji']} {cambio_principal['tendencia']} {abs(cambio_principal['magnitud']):.2f}pp\n"
+                else:
+                    storytelling += f"  • {cambio_principal['variable']}: {cambio_principal['emoji']} {cambio_principal['tendencia']} ${abs(cambio_principal['magnitud']):,.0f}\n"
         
         storytelling += "\n"
         
@@ -893,9 +894,10 @@ class FinancialChatbot:
         cambios = []
         
         for negocio in negocios:
-            for i in range(1, len(periodos)):
-                periodo_actual = periodos[i]
-                periodo_anterior = periodos[i-1]
+            # Solo comparar el último período con el primero (tendencia general)
+            if len(periodos) >= 2:
+                periodo_actual = periodos[-1]  # Último período
+                periodo_anterior = periodos[0]  # Primer período
                 
                 # Obtener valores
                 valor_actual = self._get_rate_value(variable, elaboracion, periodo_actual, escenario, negocio)
@@ -925,9 +927,10 @@ class FinancialChatbot:
         cambios = []
         
         for negocio in negocios:
-            for i in range(1, len(periodos)):
-                periodo_actual = periodos[i]
-                periodo_anterior = periodos[i-1]
+            # Solo comparar el último período con el primero (tendencia general)
+            if len(periodos) >= 2:
+                periodo_actual = periodos[-1]  # Último período
+                periodo_anterior = periodos[0]  # Primer período
                 
                 # Obtener valores
                 valor_actual = self._get_monetary_value(variable, elaboracion, periodo_actual, escenario, negocio)
