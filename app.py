@@ -377,7 +377,11 @@ class FinancialChatbot:
         
         # Extraer elaboración y cantidad de meses
         elaboracion_match = re.search(r'elaboraci[oó]n\s+(\d{2})-01-2025', query.lower())
+        
+        # Buscar "ultimos N meses" o "N ultimo(s) meses"
         meses_match = re.search(r'ultimos?\s+(\d+)\s+meses?', query.lower())
+        if not meses_match:
+            meses_match = re.search(r'(\d+)\s+ultimos?\s+meses?', query.lower())
         
         if not elaboracion_match:
             return None
