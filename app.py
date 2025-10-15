@@ -428,9 +428,6 @@ class FinancialChatbot:
                 elaboracion_prediccion = elaboracion2
                 elaboracion_realidad = elaboracion1
         
-        # Extraer filtros adicionales de la consulta
-        filtros_adicionales = self._extract_additional_filters(query)
-        
         # Determinar si separar por negocio
         separar_por_negocio = 'separalo por negocio' in query.lower() or 'separar por negocio' in query.lower()
         
