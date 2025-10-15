@@ -518,21 +518,28 @@ class FinancialChatbot:
             
             analysis += "---\n\n"
         
-        # Análisis automático de variables
+        # Análisis automático de variables - Solo cambios significativos
         analysis += "📊 **Análisis Automático de Variables:**\n\n"
         
         # Analizar cada variable para todos los negocios
         for variable in variables_clave:
-            analysis += f"🔍 **{variable}:**\n"
-            
             if variable in rate_variables:
                 # Análisis para rates
-                analysis += self._analyze_rate_variable(variable, elaboracion, periodos, escenario, negocios)
+                rate_analysis = self._analyze_rate_variable(variable, elaboracion, periodos, escenario, negocios)
+                if rate_analysis.strip():  # Solo mostrar si hay cambios significativos
+                    analysis += f"🔍 **{variable}:**\n"
+                    analysis += rate_analysis
+                    analysis += "\n"
             else:
                 # Análisis para variables monetarias
-                analysis += self._analyze_monetary_variable(variable, elaboracion, periodos, escenario, negocios)
-            
-            analysis += "\n"
+                monetary_analysis = self._analyze_monetary_variable(variable, elaboracion, periodos, escenario, negocios)
+                if monetary_analysis.strip():  # Solo mostrar si hay cambios significativos
+                    analysis += f"🔍 **{variable}:**\n"
+                    analysis += monetary_analysis
+                    analysis += "\n"
+        
+        # Storytelling completo
+        analysis += self._generate_storytelling(elaboracion, periodos, escenario, negocios)
         
         # Si se menciona "Resultado Comercial", agregar análisis por negocio
         if 'resultado comercial' in query.lower():
@@ -610,10 +617,11 @@ class FinancialChatbot:
         periodo_stats = df_analysis.groupby('periodo')['valor'].agg(['mean', 'count']).round(2)
         periodos_ordenados = sorted(periodo_stats.index)
         
+        # Solo mostrar si hay cambios significativos (>0.1pp)
+        cambios_significativos = False
         analysis += "  📅 **Comparación por Período:**\n"
         for i, periodo in enumerate(periodos_ordenados):
             stats = periodo_stats.loc[periodo]
-            analysis += f"    • {periodo}: Promedio {stats['mean']:.2f}% ({stats['count']} registros)\n"
             
             # Comparar con período anterior
             if i > 0:
@@ -623,17 +631,20 @@ class FinancialChatbot:
                 cambio = valor_actual - valor_anterior
                 porcentaje = (cambio / valor_anterior * 100) if valor_anterior != 0 else 0
                 
-                if cambio > 0:
-                    emoji = "📈"
-                    tendencia = "subió"
-                elif cambio < 0:
-                    emoji = "📉"
-                    tendencia = "bajó"
-                else:
-                    emoji = "➡️"
-                    tendencia = "se mantuvo"
-                
-                analysis += f"      {emoji} vs {periodo_anterior}: {tendencia} {abs(cambio):.2f}pp ({abs(porcentaje):.1f}%)\n"
+                # Solo mostrar si el cambio es significativo (>0.1pp)
+                if abs(cambio) > 0.1:
+                    cambios_significativos = True
+                    if cambio > 0:
+                        emoji = "📈"
+                        tendencia = "subió"
+                    elif cambio < 0:
+                        emoji = "📉"
+                        tendencia = "bajó"
+                    
+                    analysis += f"    • {periodo}: {emoji} {tendencia} {abs(cambio):.2f}pp ({abs(porcentaje):.1f}%)\n"
+        
+        if not cambios_significativos:
+            return "  ℹ️ No hay cambios significativos en este período.\n"
         
         # Análisis por negocio - comparación entre períodos
         analysis += "  🏢 **Análisis por Negocio:**\n"
@@ -722,10 +733,11 @@ class FinancialChatbot:
         periodo_stats = df_analysis.groupby('periodo')['valor'].sum().round(0)
         periodos_ordenados = sorted(periodo_stats.index)
         
+        # Solo mostrar si hay cambios significativos (>3%)
+        cambios_significativos = False
         analysis += "  📅 **Comparación por Período:**\n"
         for i, periodo in enumerate(periodos_ordenados):
             valor = periodo_stats.loc[periodo]
-            analysis += f"    • {periodo}: ${valor:,.0f}\n"
             
             # Comparar con período anterior
             if i > 0:
@@ -735,17 +747,20 @@ class FinancialChatbot:
                 cambio = valor_actual - valor_anterior
                 porcentaje = (cambio / valor_anterior * 100) if valor_anterior != 0 else 0
                 
-                if cambio > 0:
-                    emoji = "📈"
-                    tendencia = "subió"
-                elif cambio < 0:
-                    emoji = "📉"
-                    tendencia = "bajó"
-                else:
-                    emoji = "➡️"
-                    tendencia = "se mantuvo"
-                
-                analysis += f"      {emoji} vs {periodo_anterior}: {tendencia} ${abs(cambio):,.0f} ({abs(porcentaje):.1f}%)\n"
+                # Solo mostrar si el cambio es significativo (>3%)
+                if abs(porcentaje) > 3:
+                    cambios_significativos = True
+                    if cambio > 0:
+                        emoji = "📈"
+                        tendencia = "subió"
+                    elif cambio < 0:
+                        emoji = "📉"
+                        tendencia = "bajó"
+                    
+                    analysis += f"    • {periodo}: {emoji} {tendencia} ${abs(cambio):,.0f} ({abs(porcentaje):.1f}%)\n"
+        
+        if not cambios_significativos:
+            return "  ℹ️ No hay cambios significativos en este período.\n"
         
         # Análisis por negocio - comparación entre períodos
         analysis += "  🏢 **Análisis por Negocio:**\n"
@@ -785,6 +800,191 @@ class FinancialChatbot:
                     analysis += f"    • {periodo}: {negocio_dominante} lidera ({porcentaje_dominante:.1f}%)\n"
         
         return analysis
+    
+    def _generate_storytelling(self, elaboracion, periodos, escenario, negocios):
+        """Generar storytelling completo del rendimiento"""
+        storytelling = "📖 **STORYTELLING DEL RENDIMIENTO:**\n\n"
+        
+        # Obtener datos para análisis
+        variables_clave = ['Rate All In', 'New Active', 'Churn Bruto', 'Resucitados', 'Originacion Prom', 'Term', 'Risk Rate', 'Fund Rate']
+        rate_variables = ['Rate All In', 'Risk Rate', 'Fund Rate', 'Term']
+        
+        # Análisis de cambios significativos
+        cambios_significativos = []
+        
+        for variable in variables_clave:
+            if variable in rate_variables:
+                # Análisis para rates
+                cambios = self._get_significant_rate_changes(variable, elaboracion, periodos, escenario, negocios)
+                if cambios:
+                    cambios_significativos.extend(cambios)
+            else:
+                # Análisis para variables monetarias
+                cambios = self._get_significant_monetary_changes(variable, elaboracion, periodos, escenario, negocios)
+                if cambios:
+                    cambios_significativos.extend(cambios)
+        
+        if not cambios_significativos:
+            storytelling += "ℹ️ **No se detectaron cambios significativos** en el período analizado. Los indicadores se mantuvieron estables.\n\n"
+            return storytelling
+        
+        # Ordenar cambios por magnitud
+        cambios_significativos.sort(key=lambda x: abs(x['magnitud']), reverse=True)
+        
+        # Storytelling principal
+        storytelling += f"🎯 **PERÍODO ANALIZADO:** {elaboracion} (Últimos 3 meses: {', '.join(periodos)})\n"
+        storytelling += f"🎯 **ESCENARIO:** {escenario}\n\n"
+        
+        # Cambios más importantes
+        storytelling += "🔥 **CAMBIOS MÁS IMPORTANTES:**\n"
+        for i, cambio in enumerate(cambios_significativos[:5]):  # Top 5
+            storytelling += f"{i+1}. **{cambio['variable']}** en {cambio['negocio']}: "
+            if cambio['tipo'] == 'rate':
+                storytelling += f"{cambio['emoji']} {cambio['tendencia']} {abs(cambio['magnitud']):.2f}pp ({abs(cambio['porcentaje']):.1f}%)\n"
+            else:
+                storytelling += f"{cambio['emoji']} {cambio['tendencia']} ${abs(cambio['magnitud']):,.0f} ({abs(cambio['porcentaje']):.1f}%)\n"
+        
+        storytelling += "\n"
+        
+        # Análisis por negocio
+        storytelling += "🏢 **ANÁLISIS POR NEGOCIO:**\n"
+        for negocio in negocios:
+            negocio_cambios = [c for c in cambios_significativos if c['negocio'] == negocio]
+            if negocio_cambios:
+                storytelling += f"\n**{negocio}:**\n"
+                for cambio in negocio_cambios[:3]:  # Top 3 por negocio
+                    if cambio['tipo'] == 'rate':
+                        storytelling += f"  • {cambio['variable']}: {cambio['emoji']} {cambio['tendencia']} {abs(cambio['magnitud']):.2f}pp\n"
+                    else:
+                        storytelling += f"  • {cambio['variable']}: {cambio['emoji']} {cambio['tendencia']} ${abs(cambio['magnitud']):,.0f}\n"
+        
+        storytelling += "\n"
+        
+        # Conclusiones y recomendaciones
+        storytelling += "💡 **CONCLUSIONES Y RECOMENDACIONES:**\n"
+        
+        # Analizar tendencias generales
+        tendencias_positivas = [c for c in cambios_significativos if c['tendencia'] in ['subió', 'creció']]
+        tendencias_negativas = [c for c in cambios_significativos if c['tendencia'] in ['bajó', 'decreció']]
+        
+        if len(tendencias_positivas) > len(tendencias_negativas):
+            storytelling += "✅ **Tendencia general positiva:** La mayoría de indicadores muestran mejoras.\n"
+        elif len(tendencias_negativas) > len(tendencias_positivas):
+            storytelling += "⚠️ **Tendencia general negativa:** Varios indicadores muestran deterioro.\n"
+        else:
+            storytelling += "⚖️ **Tendencia mixta:** Los indicadores muestran comportamiento diverso.\n"
+        
+        # Recomendaciones específicas
+        if any(c['variable'] == 'Rate All In' and c['tendencia'] == 'subió' for c in cambios_significativos):
+            storytelling += "📈 **Rate All In en alza:** Considerar ajustes en pricing o estrategia comercial.\n"
+        
+        if any(c['variable'] == 'Churn Bruto' and c['tendencia'] == 'subió' for c in cambios_significativos):
+            storytelling += "⚠️ **Churn Bruto aumentando:** Revisar estrategias de retención de clientes.\n"
+        
+        if any(c['variable'] == 'Originacion Prom' and c['tendencia'] == 'bajó' for c in cambios_significativos):
+            storytelling += "📉 **Originacion Prom disminuyendo:** Evaluar estrategias de adquisición.\n"
+        
+        storytelling += "\n"
+        
+        return storytelling
+    
+    def _get_significant_rate_changes(self, variable, elaboracion, periodos, escenario, negocios):
+        """Obtener cambios significativos en rates (>0.1pp)"""
+        cambios = []
+        
+        for negocio in negocios:
+            for i in range(1, len(periodos)):
+                periodo_actual = periodos[i]
+                periodo_anterior = periodos[i-1]
+                
+                # Obtener valores
+                valor_actual = self._get_rate_value(variable, elaboracion, periodo_actual, escenario, negocio)
+                valor_anterior = self._get_rate_value(variable, elaboracion, periodo_anterior, escenario, negocio)
+                
+                if valor_actual is not None and valor_anterior is not None:
+                    cambio = valor_actual - valor_anterior
+                    porcentaje = (cambio / valor_anterior * 100) if valor_anterior != 0 else 0
+                    
+                    if abs(cambio) > 0.1:  # Cambio significativo
+                        cambios.append({
+                            'variable': variable,
+                            'negocio': negocio,
+                            'periodo': periodo_actual,
+                            'periodo_anterior': periodo_anterior,
+                            'magnitud': cambio,
+                            'porcentaje': porcentaje,
+                            'tendencia': 'subió' if cambio > 0 else 'bajó',
+                            'emoji': '📈' if cambio > 0 else '📉',
+                            'tipo': 'rate'
+                        })
+        
+        return cambios
+    
+    def _get_significant_monetary_changes(self, variable, elaboracion, periodos, escenario, negocios):
+        """Obtener cambios significativos en variables monetarias (>3%)"""
+        cambios = []
+        
+        for negocio in negocios:
+            for i in range(1, len(periodos)):
+                periodo_actual = periodos[i]
+                periodo_anterior = periodos[i-1]
+                
+                # Obtener valores
+                valor_actual = self._get_monetary_value(variable, elaboracion, periodo_actual, escenario, negocio)
+                valor_anterior = self._get_monetary_value(variable, elaboracion, periodo_anterior, escenario, negocio)
+                
+                if valor_actual is not None and valor_anterior is not None:
+                    cambio = valor_actual - valor_anterior
+                    porcentaje = (cambio / valor_anterior * 100) if valor_anterior != 0 else 0
+                    
+                    if abs(porcentaje) > 3:  # Cambio significativo
+                        cambios.append({
+                            'variable': variable,
+                            'negocio': negocio,
+                            'periodo': periodo_actual,
+                            'periodo_anterior': periodo_anterior,
+                            'magnitud': cambio,
+                            'porcentaje': porcentaje,
+                            'tendencia': 'creció' if cambio > 0 else 'decreció',
+                            'emoji': '📈' if cambio > 0 else '📉',
+                            'tipo': 'monetary'
+                        })
+        
+        return cambios
+    
+    def _get_rate_value(self, variable, elaboracion, periodo, escenario, negocio):
+        """Obtener valor de rate para un negocio específico"""
+        filtro = (
+            (self.df['Elaboracion'] == elaboracion) & 
+            (self.df['Periodo'] == periodo) & 
+            (self.df['Concepto'] == variable) &
+            (self.df['Negocio'] == negocio)
+        )
+        
+        if escenario:
+            filtro = filtro & (self.df['Escenario'] == escenario)
+        
+        data = self.df[filtro]
+        if len(data) > 0:
+            return data['Valor'].mean()
+        return None
+    
+    def _get_monetary_value(self, variable, elaboracion, periodo, escenario, negocio):
+        """Obtener valor monetario para un negocio específico"""
+        filtro = (
+            (self.df['Elaboracion'] == elaboracion) & 
+            (self.df['Periodo'] == periodo) & 
+            (self.df['Concepto'] == variable) &
+            (self.df['Negocio'] == negocio)
+        )
+        
+        if escenario:
+            filtro = filtro & (self.df['Escenario'] == escenario)
+        
+        data = self.df[filtro]
+        if len(data) > 0:
+            return data['Valor'].sum()
+        return None
     
     def generate_analysis(self, query, df, filters):
         """Generar análisis basado en la consulta y filtros"""
