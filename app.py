@@ -891,7 +891,9 @@ def main():
             if message["role"] == "user":
                 st.markdown(f'<div class="chat-message user-message">👤 **Tú:** {message["content"]}</div>', unsafe_allow_html=True)
             else:
-                st.markdown(f'<div class="chat-message bot-message">🤖 **Bot:** {message["content"]}</div>', unsafe_allow_html=True)
+                # Convertir saltos de línea a <br> para HTML
+                content_html = message["content"].replace('\n', '<br>')
+                st.markdown(f'<div class="chat-message bot-message">🤖 **Bot:** {content_html}</div>', unsafe_allow_html=True)
     
     # Input de usuario
     user_input = st.text_input("Escribe tu consulta:", key="user_input")
