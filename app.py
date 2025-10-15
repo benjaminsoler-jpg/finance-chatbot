@@ -524,6 +524,18 @@ class FinancialChatbot:
             
             analysis += "---\n\n"
         
+        # Obtener cambios significativos para análisis y visualizaciones
+        cambios_significativos = []
+        for variable in variables_clave:
+            if variable in rate_variables:
+                cambios = self._get_significant_rate_changes(variable, elaboracion, periodos, escenario, negocios)
+                if cambios:
+                    cambios_significativos.extend(cambios)
+            else:
+                cambios = self._get_significant_monetary_changes(variable, elaboracion, periodos, escenario, negocios)
+                if cambios:
+                    cambios_significativos.extend(cambios)
+        
         # Análisis automático de variables - Solo cambios significativos
         analysis += "📊 **Análisis Automático de Variables:**\n\n"
         
@@ -546,6 +558,9 @@ class FinancialChatbot:
         
         # Storytelling completo
         analysis += self._generate_storytelling(elaboracion, periodos, escenario, negocios)
+        
+        # Visualizaciones interactivas
+        analysis += self.generate_visualizations(cambios_significativos, elaboracion, periodos, escenario)
         
         # Si se menciona "Resultado Comercial", agregar análisis por negocio
         if 'resultado comercial' in query.lower():
@@ -907,6 +922,212 @@ class FinancialChatbot:
         storytelling += "\n"
         
         return storytelling
+    
+    def generate_visualizations(self, cambios_significativos, elaboracion, periodos, escenario):
+        """Generar visualizaciones con Plotly para los cambios significativos"""
+        if not cambios_significativos:
+            return "ℹ️ No hay cambios significativos para visualizar.\n\n"
+        
+        visualizations = "📊 **VISUALIZACIONES INTERACTIVAS:**\n\n"
+        
+        # 1. Gráfico de barras - Top cambios por magnitud
+        visualizations += self._create_top_changes_chart(cambios_significativos)
+        
+        # 2. Gráfico de líneas - Tendencias temporales
+        visualizations += self._create_trends_chart(cambios_significativos, elaboracion, periodos, escenario)
+        
+        # 3. Gráfico de torta - Distribución por segmento
+        visualizations += self._create_segment_distribution_chart(cambios_significativos)
+        
+        # 4. Heatmap - Cambios por variable y negocio
+        visualizations += self._create_heatmap_chart(cambios_significativos)
+        
+        return visualizations
+    
+    def _create_top_changes_chart(self, cambios_significativos):
+        """Crear gráfico de barras con los cambios más importantes"""
+        import plotly.express as px
+        import plotly.graph_objects as go
+        
+        # Preparar datos
+        top_changes = sorted(cambios_significativos, key=lambda x: abs(x['magnitud']), reverse=True)[:10]
+        
+        data = []
+        for cambio in top_changes:
+            if cambio['tipo'] == 'rate':
+                valor = cambio['magnitud']
+                unidad = "pp"
+            else:
+                valor = cambio['magnitud'] / 1000000  # Convertir a millones
+                unidad = "M$"
+            
+            data.append({
+                'Variable': cambio['variable'],
+                'Negocio': cambio['negocio'],
+                'Valor': valor,
+                'Tendencia': cambio['tendencia'],
+                'Unidad': unidad,
+                'Label': f"{cambio['negocio']} - {cambio['variable']}"
+            })
+        
+        if not data:
+            return ""
+        
+        df_viz = pd.DataFrame(data)
+        
+        # Crear gráfico
+        fig = px.bar(
+            df_viz, 
+            x='Valor', 
+            y='Label',
+            color='Tendencia',
+            color_discrete_map={'creció': '#2E8B57', 'subió': '#2E8B57', 'decreció': '#DC143C', 'bajó': '#DC143C'},
+            title="🔝 Top 10 Cambios Más Significativos",
+            labels={'Valor': 'Magnitud del Cambio', 'Label': 'Variable - Negocio'}
+        )
+        
+        fig.update_layout(
+            height=400,
+            showlegend=True,
+            yaxis={'categoryorder': 'total ascending'}
+        )
+        
+        return f"**Gráfico 1: Top Cambios por Magnitud**\n{fig.to_html(include_plotlyjs='cdn', div_id='top_changes')}\n\n"
+    
+    def _create_trends_chart(self, cambios_significativos, elaboracion, periodos, escenario):
+        """Crear gráfico de líneas para tendencias temporales"""
+        import plotly.express as px
+        import plotly.graph_objects as go
+        
+        # Agrupar por variable y negocio
+        trends_data = {}
+        for cambio in cambios_significativos:
+            key = f"{cambio['variable']} - {cambio['negocio']}"
+            if key not in trends_data:
+                trends_data[key] = []
+            trends_data[key].append({
+                'periodo': cambio['periodo'],
+                'valor': cambio['magnitud'],
+                'tendencia': cambio['tendencia']
+            })
+        
+        if not trends_data:
+            return ""
+        
+        # Crear gráfico de líneas
+        fig = go.Figure()
+        
+        colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
+        
+        for i, (key, data) in enumerate(trends_data.items()):
+            if len(data) > 1:  # Solo mostrar si hay múltiples puntos
+                df_trend = pd.DataFrame(data)
+                df_trend = df_trend.sort_values('periodo')
+                
+                fig.add_trace(go.Scatter(
+                    x=df_trend['periodo'],
+                    y=df_trend['valor'],
+                    mode='lines+markers',
+                    name=key,
+                    line=dict(color=colors[i % len(colors)], width=3),
+                    marker=dict(size=8)
+                ))
+        
+        fig.update_layout(
+            title="📈 Tendencias Temporales por Variable y Negocio",
+            xaxis_title="Período",
+            yaxis_title="Magnitud del Cambio",
+            height=400,
+            showlegend=True
+        )
+        
+        return f"**Gráfico 2: Tendencias Temporales**\n{fig.to_html(include_plotlyjs='cdn', div_id='trends')}\n\n"
+    
+    def _create_segment_distribution_chart(self, cambios_significativos):
+        """Crear gráfico de torta para distribución por segmento"""
+        import plotly.express as px
+        
+        # Contar cambios por negocio
+        negocio_counts = {}
+        for cambio in cambios_significativos:
+            negocio = cambio['negocio']
+            if negocio not in negocio_counts:
+                negocio_counts[negocio] = {'positivos': 0, 'negativos': 0}
+            
+            if cambio['tendencia'] in ['creció', 'subió']:
+                negocio_counts[negocio]['positivos'] += 1
+            else:
+                negocio_counts[negocio]['negativos'] += 1
+        
+        if not negocio_counts:
+            return ""
+        
+        # Preparar datos para gráfico de torta
+        labels = []
+        values = []
+        colors = []
+        
+        for negocio, counts in negocio_counts.items():
+            total = counts['positivos'] + counts['negativos']
+            if total > 0:
+                labels.append(f"{negocio} ({total} cambios)")
+                values.append(total)
+                # Color basado en la proporción de positivos
+                if counts['positivos'] > counts['negativos']:
+                    colors.append('#2E8B57')  # Verde
+                elif counts['negativos'] > counts['positivos']:
+                    colors.append('#DC143C')  # Rojo
+                else:
+                    colors.append('#FFD700')  # Amarillo
+        
+        fig = px.pie(
+            values=values,
+            names=labels,
+            title="🥧 Distribución de Cambios por Segmento de Negocio",
+            color_discrete_sequence=colors
+        )
+        
+        fig.update_layout(height=400)
+        
+        return f"**Gráfico 3: Distribución por Segmento**\n{fig.to_html(include_plotlyjs='cdn', div_id='distribution')}\n\n"
+    
+    def _create_heatmap_chart(self, cambios_significativos):
+        """Crear heatmap de cambios por variable y negocio"""
+        import plotly.express as px
+        
+        # Preparar matriz de datos
+        variables = list(set([c['variable'] for c in cambios_significativos]))
+        negocios = list(set([c['negocio'] for c in cambios_significativos]))
+        
+        # Crear matriz de valores
+        matrix_data = []
+        for variable in variables:
+            row = []
+            for negocio in negocios:
+                # Buscar el cambio para esta combinación
+                cambio = next((c for c in cambios_significativos if c['variable'] == variable and c['negocio'] == negocio), None)
+                if cambio:
+                    row.append(cambio['magnitud'])
+                else:
+                    row.append(0)
+            matrix_data.append(row)
+        
+        if not matrix_data:
+            return ""
+        
+        # Crear heatmap
+        fig = px.imshow(
+            matrix_data,
+            x=negocios,
+            y=variables,
+            color_continuous_scale='RdBu',
+            title="🔥 Heatmap: Cambios por Variable y Negocio",
+            labels=dict(x="Negocio", y="Variable", color="Magnitud del Cambio")
+        )
+        
+        fig.update_layout(height=400)
+        
+        return f"**Gráfico 4: Heatmap de Cambios**\n{fig.to_html(include_plotlyjs='cdn', div_id='heatmap')}\n\n"
     
     def _analyze_originacion_prom(self, cambios):
         """Análisis experto de Originacion Prom"""
