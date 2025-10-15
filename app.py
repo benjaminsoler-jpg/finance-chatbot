@@ -594,15 +594,14 @@ class FinancialChatbot:
                 
                 data = self.df[filtro]
                 if len(data) > 0:
-                    grouped = data.groupby(['Clasificación', 'Cohort_Act'])['Valor'].first().reset_index()
+                    # Agrupar por Cohort_Act y tomar solo el primer registro de cada cohort único
+                    grouped = data.groupby('Cohort_Act')['Valor'].first().reset_index()
                     for _, row in grouped.iterrows():
-                        clasificacion = row['Clasificación'] if pd.notna(row['Clasificación']) else 'Sin clasificación'
                         cohort = row['Cohort_Act'] if pd.notna(row['Cohort_Act']) else 'Sin cohort'
                         valor = row['Valor']
                         all_data.append({
                             'negocio': negocio,
                             'periodo': periodo,
-                            'clasificacion': clasificacion,
                             'cohort': cohort,
                             'valor': valor
                         })
@@ -716,6 +715,7 @@ class FinancialChatbot:
                 
                 data = self.df[filtro]
                 if len(data) > 0:
+                    # Para variables monetarias, sumar todos los valores del período
                     valor = data['Valor'].sum()
                     all_data.append({
                         'negocio': negocio,
@@ -966,7 +966,9 @@ class FinancialChatbot:
         
         data = self.df[filtro]
         if len(data) > 0:
-            return data['Valor'].mean()
+            # Para rates, agrupar por cohort y tomar el primer valor de cada cohort único
+            grouped = data.groupby('Cohort_Act')['Valor'].first()
+            return grouped.mean()
         return None
     
     def _get_monetary_value(self, variable, elaboracion, periodo, escenario, negocio):
