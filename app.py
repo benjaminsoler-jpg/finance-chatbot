@@ -388,45 +388,42 @@ class FinancialChatbot:
         """Análisis específico de Rolling Predictivo vs Realidad Histórica"""
         import re
         
-        # Detectar patrón: "comparame los periodos X elaboracion Y y el periodo X elaboracion Z"
-        pattern = r'comparame\s+los\s+periodos?\s+(\d{2})-01-2025\s+elaboraci[oó]n\s+(\d{2})-01-2025\s+y\s+el\s+periodo\s+(\d{2})-01-2025\s+elaboraci[oó]n\s+(\d{2})-01-2025'
-        match = re.search(pattern, query.lower())
+        # Patrón 1: "comparame los periodos X elaboracion Y y el periodo X elaboracion Z"
+        pattern1 = r'comparame\s+los\s+periodos?\s+(\d{2})-01-2025\s+elaboraci[oó]n\s+(\d{2})-01-2025\s+y\s+el\s+periodo\s+(\d{2})-01-2025\s+elaboraci[oó]n\s+(\d{2})-01-2025'
+        match1 = re.search(pattern1, query.lower())
         
-        if not match:
-            return None
+        # Patrón 2: "como me fue en la elaboracion X sobre el periodo Y, comparando con la predicha en la elaboracion Z en el periodo Y"
+        pattern2 = r'como me fue en la elaboraci[oó]n\s+(\d{2})-01-2025\s+sobre el periodo\s+(\d{2})-01-2025.*?comparando con la predicha en la elaboraci[oó]n\s+(\d{2})-01-2025\s+en el periodo\s+(\d{2})-01-2025'
+        match2 = re.search(pattern2, query.lower())
         
-        periodo1 = match.group(1) + '-01-2025'
-        elaboracion1 = match.group(2) + '-01-2025'
-        periodo2 = match.group(3) + '-01-2025'
-        elaboracion2 = match.group(4) + '-01-2025'
-        
-        # Verificar que ambos períodos sean iguales
-        if periodo1 != periodo2:
-            return None
-        
-        periodo = periodo1
-        
-        # Determinar cuál es predicción y cuál es realidad
-        mes_elaboracion1 = int(elaboracion1.split('-')[0])
-        mes_elaboracion2 = int(elaboracion2.split('-')[0])
-        mes_periodo = int(periodo.split('-')[0])
-        
-        # Si elaboración = período, es predicción (rolling predictivo)
-        # Si elaboración > período, es realidad (datos históricos)
-        if mes_elaboracion1 == mes_periodo:
-            elaboracion_prediccion = elaboracion1
-            elaboracion_realidad = elaboracion2
-        elif mes_elaboracion2 == mes_periodo:
-            elaboracion_prediccion = elaboracion2
+        if match1:
+            # Patrón 1
+            periodo1 = match1.group(1) + '-01-2025'
+            elaboracion1 = match1.group(2) + '-01-2025'
+            periodo2 = match1.group(3) + '-01-2025'
+            elaboracion2 = match1.group(4) + '-01-2025'
+            
+            # Verificar que ambos períodos sean iguales
+            if periodo1 != periodo2:
+                return None
+            
+            periodo = periodo1
             elaboracion_realidad = elaboracion1
+            elaboracion_prediccion = elaboracion2
+            
+        elif match2:
+            # Patrón 2
+            elaboracion_realidad = match2.group(1) + '-01-2025'
+            periodo = match2.group(2) + '-01-2025'
+            elaboracion_prediccion = match2.group(3) + '-01-2025'
+            periodo_verificacion = match2.group(4) + '-01-2025'
+            
+            # Verificar que ambos períodos sean iguales
+            if periodo != periodo_verificacion:
+                return None
+                
         else:
-            # Si ninguna coincide exactamente, usar la más cercana
-            if abs(mes_elaboracion1 - mes_periodo) < abs(mes_elaboracion2 - mes_periodo):
-                elaboracion_prediccion = elaboracion1
-                elaboracion_realidad = elaboracion2
-            else:
-                elaboracion_prediccion = elaboracion2
-                elaboracion_realidad = elaboracion1
+            return None
         
         # Determinar si separar por negocio
         separar_por_negocio = 'separalo por negocio' in query.lower() or 'separar por negocio' in query.lower()
@@ -3749,13 +3746,19 @@ class FinancialChatbot:
                 if rolling_analysis:
                     return rolling_analysis
             
-            # Verificar si es una consulta de "últimos N meses" (PRIORIDAD ALTA)
+            # Verificar si es una consulta "como me fue" con comparación rolling (PRIORIDAD ALTA)
+            if ('como me fue' in user_message.lower() or 'como nos fue' in user_message.lower()) and 'comparando' in user_message.lower():
+                rolling_analysis = self.analyze_rolling_comparison(user_message)
+                if rolling_analysis:
+                    return rolling_analysis
+            
+            # Verificar si es una consulta de "últimos N meses" (PRIORIDAD MEDIA)
             if ('ultimos' in user_message.lower() or 'ultimo' in user_message.lower()) and 'meses' in user_message.lower():
                 months_analysis = self.analyze_last_months_performance(user_message)
                 if months_analysis:
                     return months_analysis
             
-            # Verificar si es una consulta de "como nos fue" (comparación) - PRIORIDAD BAJA
+            # Verificar si es una consulta de "como nos fue" (comparación simple) - PRIORIDAD BAJA
             if 'como nos fue' in user_message.lower() or 'como me fue' in user_message.lower():
                 if 'elaboracion' in user_message.lower():
                     comparison_analysis = self.analyze_performance_comparison(user_message)
