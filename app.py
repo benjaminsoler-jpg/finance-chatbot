@@ -260,7 +260,7 @@ class FinancialChatbot:
             'escenario', 'pais', 'país', 'valor', 'análisis', 'analisis', 'datos',
             'financiero', 'financiera', 'comercial', 'ventas', 'ingresos', 'costos',
             'margen', 'rentabilidad', 'inversión', 'inversion', 'como me fue', 'como nos fue',
-            'ultimos', 'últimos', 'meses', 'comparar', 'predicción', 'prediccion'
+            'ultimos', 'últimos', 'ultimo', 'último', 'meses', 'mes', 'comparar', 'predicción', 'prediccion'
         ]
         
         query_lower = query.lower()
@@ -748,7 +748,7 @@ class FinancialChatbot:
         # Si es financiera, intentar análisis especializados primero
         if is_financial:
             # Verificar si es una consulta de "últimos N meses" (PRIORIDAD ALTA)
-            if 'ultimos' in user_message.lower() and 'meses' in user_message.lower():
+            if ('ultimos' in user_message.lower() or 'ultimo' in user_message.lower()) and 'meses' in user_message.lower():
                 months_analysis = self.analyze_last_months_performance(user_message)
                 if months_analysis:
                     return months_analysis
