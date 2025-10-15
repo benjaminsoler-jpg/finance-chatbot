@@ -259,11 +259,187 @@ class FinancialChatbot:
             'periodo', 'período', 'negocio', 'concepto', 'clasificación', 'cohort',
             'escenario', 'pais', 'país', 'valor', 'análisis', 'analisis', 'datos',
             'financiero', 'financiera', 'comercial', 'ventas', 'ingresos', 'costos',
-            'margen', 'rentabilidad', 'inversión', 'inversion'
+            'margen', 'rentabilidad', 'inversión', 'inversion', 'como me fue', 'como nos fue',
+            'ultimos', 'últimos', 'meses', 'comparar', 'predicción', 'prediccion'
         ]
         
         query_lower = query.lower()
         return any(keyword in query_lower for keyword in financial_keywords)
+    
+    def analyze_performance_comparison(self, query: str) -> str:
+        """Análisis de comparación de rendimiento: predicción vs realidad"""
+        import re
+        
+        # Extraer elaboración de la consulta
+        elaboracion_match = re.search(r'elaboracion\s+(\d{2})-01-2025', query.lower())
+        if not elaboracion_match:
+            return None
+        
+        elaboracion = elaboracion_match.group(1) + '-01-2025'
+        
+        # Calcular elaboración anterior (predicción)
+        mes_actual = int(elaboracion.split('-')[0])
+        mes_anterior = mes_actual - 1
+        if mes_anterior <= 0:
+            mes_anterior = 12
+        elaboracion_anterior = f"{mes_anterior:02d}-01-2025"
+        
+        # Variables específicas para comparar
+        variables_comparacion = {
+            'concepto': ['Rate All In', 'Originacion Prom', 'Term', 'Risk Rate', 'Fund Rate'],
+            'clasificacion': ['New Active', 'Churn Bruto', 'Resucitados']
+        }
+        
+        analysis = f"📊 **Análisis de Rendimiento: Predicción vs Realidad**\n"
+        analysis += f"🎯 **Elaboración analizada:** {elaboracion}\n"
+        analysis += f"📈 **Predicción:** {elaboracion_anterior} (Periodo {elaboracion})\n"
+        analysis += f"📉 **Realidad:** {elaboracion} (Periodo {elaboracion})\n\n"
+        
+        # Comparar por Concepto
+        analysis += "📋 **Comparación por Concepto:**\n"
+        for concepto in variables_comparacion['concepto']:
+            # Datos de predicción
+            pred_data = self.df[
+                (self.df['Elaboracion'] == elaboracion_anterior) & 
+                (self.df['Periodo'] == elaboracion) & 
+                (self.df['Concepto'] == concepto)
+            ]
+            
+            # Datos de realidad
+            real_data = self.df[
+                (self.df['Elaboracion'] == elaboracion) & 
+                (self.df['Periodo'] == elaboracion) & 
+                (self.df['Concepto'] == concepto)
+            ]
+            
+            if len(pred_data) > 0 and len(real_data) > 0:
+                pred_valor = pred_data['Valor'].sum()
+                real_valor = real_data['Valor'].sum()
+                
+                if pred_valor != 0:
+                    diferencia = real_valor - pred_valor
+                    porcentaje = (diferencia / pred_valor) * 100
+                    
+                    if diferencia > 0:
+                        emoji = "📈"
+                        tendencia = "mejor"
+                    else:
+                        emoji = "📉"
+                        tendencia = "peor"
+                    
+                    analysis += f"  {emoji} **{concepto}:**\n"
+                    analysis += f"    - Predicción: ${pred_valor:,}\n"
+                    analysis += f"    - Realidad: ${real_valor:,}\n"
+                    analysis += f"    - Diferencia: ${diferencia:,} ({porcentaje:+.1f}%) - {tendencia}\n\n"
+        
+        # Comparar por Clasificación
+        analysis += "🏷️ **Comparación por Clasificación:**\n"
+        for clasificacion in variables_comparacion['clasificacion']:
+            # Datos de predicción
+            pred_data = self.df[
+                (self.df['Elaboracion'] == elaboracion_anterior) & 
+                (self.df['Periodo'] == elaboracion) & 
+                (self.df['Clasificación'] == clasificacion)
+            ]
+            
+            # Datos de realidad
+            real_data = self.df[
+                (self.df['Elaboracion'] == elaboracion) & 
+                (self.df['Periodo'] == elaboracion) & 
+                (self.df['Clasificación'] == clasificacion)
+            ]
+            
+            if len(pred_data) > 0 and len(real_data) > 0:
+                pred_valor = pred_data['Valor'].sum()
+                real_valor = real_data['Valor'].sum()
+                
+                if pred_valor != 0:
+                    diferencia = real_valor - pred_valor
+                    porcentaje = (diferencia / pred_valor) * 100
+                    
+                    if diferencia > 0:
+                        emoji = "📈"
+                        tendencia = "mejor"
+                    else:
+                        emoji = "📉"
+                        tendencia = "peor"
+                    
+                    analysis += f"  {emoji} **{clasificacion}:**\n"
+                    analysis += f"    - Predicción: ${pred_valor:,}\n"
+                    analysis += f"    - Realidad: ${real_valor:,}\n"
+                    analysis += f"    - Diferencia: ${diferencia:,} ({porcentaje:+.1f}%) - {tendencia}\n\n"
+        
+        return analysis
+    
+    def analyze_last_months_performance(self, query: str) -> str:
+        """Análisis de rendimiento de los últimos N meses"""
+        import re
+        
+        # Extraer elaboración y cantidad de meses
+        elaboracion_match = re.search(r'elaboracion\s+(\d{2})-01-2025', query.lower())
+        meses_match = re.search(r'ultimos?\s+(\d+)\s+meses?', query.lower())
+        
+        if not elaboracion_match:
+            return None
+        
+        elaboracion = elaboracion_match.group(1) + '-01-2025'
+        meses = int(meses_match.group(1)) if meses_match else 3
+        
+        # Calcular períodos anteriores
+        mes_actual = int(elaboracion.split('-')[0])
+        periodos = []
+        for i in range(meses):
+            mes_anterior = mes_actual - i - 1
+            if mes_anterior <= 0:
+                mes_anterior += 12
+            periodos.append(f"{mes_anterior:02d}-01-2025")
+        
+        analysis = f"📊 **Rendimiento de los Últimos {meses} Meses**\n"
+        analysis += f"🎯 **Elaboración base:** {elaboracion}\n"
+        analysis += f"📅 **Períodos analizados:** {', '.join(periodos)}\n\n"
+        
+        # Variables clave para análisis
+        variables_clave = ['Rate All In', 'Originacion Prom', 'Term', 'Risk Rate', 'Fund Rate']
+        
+        for variable in variables_clave:
+            analysis += f"📈 **{variable}:**\n"
+            
+            valores_por_periodo = []
+            for periodo in periodos:
+                data = self.df[
+                    (self.df['Elaboracion'] == elaboracion) & 
+                    (self.df['Periodo'] == periodo) & 
+                    (self.df['Concepto'] == variable)
+                ]
+                
+                if len(data) > 0:
+                    valor = data['Valor'].sum()
+                    valores_por_periodo.append(valor)
+                    analysis += f"  - {periodo}: ${valor:,}\n"
+                else:
+                    analysis += f"  - {periodo}: Sin datos\n"
+            
+            if len(valores_por_periodo) > 1:
+                # Calcular tendencia
+                primer_valor = valores_por_periodo[0]
+                ultimo_valor = valores_por_periodo[-1]
+                
+                if primer_valor != 0:
+                    cambio = ultimo_valor - primer_valor
+                    porcentaje = (cambio / primer_valor) * 100
+                    
+                    if cambio > 0:
+                        tendencia = "📈 Creciendo"
+                    elif cambio < 0:
+                        tendencia = "📉 Decreciendo"
+                    else:
+                        tendencia = "➡️ Estable"
+                    
+                    analysis += f"  **Tendencia:** {tendencia} ({porcentaje:+.1f}%)\n"
+            
+            analysis += "\n"
+        
+        return analysis
     
     def generate_analysis(self, query, df, filters):
         """Generar análisis basado en la consulta y filtros"""
@@ -517,8 +693,22 @@ class FinancialChatbot:
         # Detectar si es una consulta financiera
         is_financial = self.is_financial_query(user_message)
         
-        # Si es financiera, intentar análisis de datos primero
+        # Si es financiera, intentar análisis especializados primero
         if is_financial:
+            # Verificar si es una consulta de "como nos fue" (comparación)
+            if 'como nos fue' in user_message.lower() or 'como me fue' in user_message.lower():
+                if 'elaboracion' in user_message.lower():
+                    comparison_analysis = self.analyze_performance_comparison(user_message)
+                    if comparison_analysis:
+                        return comparison_analysis
+            
+            # Verificar si es una consulta de "últimos N meses"
+            if 'ultimos' in user_message.lower() and 'meses' in user_message.lower():
+                months_analysis = self.analyze_last_months_performance(user_message)
+                if months_analysis:
+                    return months_analysis
+            
+            # Análisis de datos estándar
             data_analysis = self.analyze_data(user_message)
             if data_analysis and "No hay datos disponibles" not in data_analysis:
                 return data_analysis
