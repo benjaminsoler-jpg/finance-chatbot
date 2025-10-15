@@ -384,6 +384,147 @@ class FinancialChatbot:
         
         return analysis
     
+    def analyze_rolling_comparison(self, query: str) -> str:
+        """Análisis específico de Rolling Predictivo vs Realidad Histórica"""
+        import re
+        
+        # Detectar patrón: "comparame los periodos X elaboracion Y y el periodo X elaboracion Z"
+        pattern = r'comparame\s+los\s+periodos?\s+(\d{2})-01-2025\s+elaboraci[oó]n\s+(\d{2})-01-2025\s+y\s+el\s+periodo\s+(\d{2})-01-2025\s+elaboraci[oó]n\s+(\d{2})-01-2025'
+        match = re.search(pattern, query.lower())
+        
+        if not match:
+            return None
+        
+        periodo1 = match.group(1) + '-01-2025'
+        elaboracion1 = match.group(2) + '-01-2025'
+        periodo2 = match.group(3) + '-01-2025'
+        elaboracion2 = match.group(4) + '-01-2025'
+        
+        # Verificar que ambos períodos sean iguales
+        if periodo1 != periodo2:
+            return None
+        
+        periodo = periodo1
+        
+        # Determinar cuál es predicción y cuál es realidad
+        mes_elaboracion1 = int(elaboracion1.split('-')[0])
+        mes_elaboracion2 = int(elaboracion2.split('-')[0])
+        mes_periodo = int(periodo.split('-')[0])
+        
+        # Si elaboración = período, es predicción (rolling predictivo)
+        # Si elaboración > período, es realidad (datos históricos)
+        if mes_elaboracion1 == mes_periodo:
+            elaboracion_prediccion = elaboracion1
+            elaboracion_realidad = elaboracion2
+        elif mes_elaboracion2 == mes_periodo:
+            elaboracion_prediccion = elaboracion2
+            elaboracion_realidad = elaboracion1
+        else:
+            # Si ninguna coincide exactamente, usar la más cercana
+            if abs(mes_elaboracion1 - mes_periodo) < abs(mes_elaboracion2 - mes_periodo):
+                elaboracion_prediccion = elaboracion1
+                elaboracion_realidad = elaboracion2
+            else:
+                elaboracion_prediccion = elaboracion2
+                elaboracion_realidad = elaboracion1
+        
+        analysis = f"📊 **Análisis Rolling: Predicción vs Realidad**\n"
+        analysis += f"🎯 **Período analizado:** {periodo}\n"
+        analysis += f"📈 **Rolling Predictivo:** {elaboracion_prediccion} (Elaboración = Período)\n"
+        analysis += f"📉 **Datos Históricos:** {elaboracion_realidad} (Elaboración > Período)\n\n"
+        
+        # Variables específicas para comparar
+        variables_comparacion = {
+            'concepto': ['Rate All In', 'Originacion Prom', 'Term', 'Risk Rate', 'Fund Rate'],
+            'clasificacion': ['New Active', 'Churn Bruto', 'Resucitados']
+        }
+        
+        # Comparar por Concepto
+        analysis += "📋 **Comparación por Concepto:**\n"
+        for concepto in variables_comparacion['concepto']:
+            # Datos de predicción (rolling predictivo)
+            pred_data = self.df[
+                (self.df['Elaboracion'] == elaboracion_prediccion) & 
+                (self.df['Periodo'] == periodo) & 
+                (self.df['Concepto'] == concepto)
+            ]
+            
+            # Datos de realidad (históricos)
+            real_data = self.df[
+                (self.df['Elaboracion'] == elaboracion_realidad) & 
+                (self.df['Periodo'] == periodo) & 
+                (self.df['Concepto'] == concepto)
+            ]
+            
+            if len(pred_data) > 0 and len(real_data) > 0:
+                pred_valor = pred_data['Valor'].sum()
+                real_valor = real_data['Valor'].sum()
+                
+                diferencia = real_valor - pred_valor
+                porcentaje = (diferencia / pred_valor * 100) if pred_valor != 0 else 0
+                
+                if diferencia > 0:
+                    tendencia = "mejor"
+                    emoji = "📈"
+                elif diferencia < 0:
+                    tendencia = "peor"
+                    emoji = "📉"
+                else:
+                    tendencia = "igual"
+                    emoji = "➡️"
+                
+                if concepto in ['Rate All In', 'Risk Rate', 'Fund Rate', 'Term']:
+                    analysis += f"  {emoji} **{concepto}:**\n"
+                    analysis += f"    - Rolling Predictivo: {pred_valor:.3f}\n"
+                    analysis += f"    - Datos Históricos: {real_valor:.3f}\n"
+                    analysis += f"    - Diferencia: {diferencia:+.3f} ({porcentaje:+.1f}%) - {tendencia}\n\n"
+                else:
+                    analysis += f"  {emoji} **{concepto}:**\n"
+                    analysis += f"    - Rolling Predictivo: ${pred_valor:,.0f}\n"
+                    analysis += f"    - Datos Históricos: ${real_valor:,.0f}\n"
+                    analysis += f"    - Diferencia: ${diferencia:+,.0f} ({porcentaje:+.1f}%) - {tendencia}\n\n"
+        
+        # Comparar por Clasificación
+        analysis += "🏷️ **Comparación por Clasificación:**\n"
+        for clasificacion in variables_comparacion['clasificacion']:
+            # Datos de predicción (rolling predictivo)
+            pred_data = self.df[
+                (self.df['Elaboracion'] == elaboracion_prediccion) & 
+                (self.df['Periodo'] == periodo) & 
+                (self.df['Clasificación'] == clasificacion)
+            ]
+            
+            # Datos de realidad (históricos)
+            real_data = self.df[
+                (self.df['Elaboracion'] == elaboracion_realidad) & 
+                (self.df['Periodo'] == periodo) & 
+                (self.df['Clasificación'] == clasificacion)
+            ]
+            
+            if len(pred_data) > 0 and len(real_data) > 0:
+                pred_valor = pred_data['Valor'].sum()
+                real_valor = real_data['Valor'].sum()
+                
+                diferencia = real_valor - pred_valor
+                porcentaje = (diferencia / pred_valor * 100) if pred_valor != 0 else 0
+                
+                if diferencia > 0:
+                    tendencia = "mejor"
+                    emoji = "📈"
+                elif diferencia < 0:
+                    tendencia = "peor"
+                    emoji = "📉"
+                else:
+                    tendencia = "igual"
+                    emoji = "➡️"
+                
+                analysis += f"  {emoji} **{clasificacion}:**\n"
+                analysis += f"    - Rolling Predictivo: ${pred_valor:,.0f}\n"
+                analysis += f"    - Datos Históricos: ${real_valor:,.0f}\n"
+                analysis += f"    - Diferencia: ${diferencia:+,.0f} ({porcentaje:+.1f}%) - {tendencia}\n\n"
+        
+        return analysis
+    
     def analyze_last_months_performance(self, query: str) -> str:
         """Análisis de rendimiento de los últimos N meses"""
         import re
@@ -2565,6 +2706,12 @@ class FinancialChatbot:
         
         # Si es financiera, intentar análisis especializados primero
         if is_financial:
+            # Verificar si es una consulta de comparación rolling específica (PRIORIDAD MÁS ALTA)
+            if 'comparame' in user_message.lower() and 'periodos' in user_message.lower() and 'elaboracion' in user_message.lower():
+                rolling_analysis = self.analyze_rolling_comparison(user_message)
+                if rolling_analysis:
+                    return rolling_analysis
+            
             # Verificar si es una consulta de "últimos N meses" (PRIORIDAD ALTA)
             if ('ultimos' in user_message.lower() or 'ultimo' in user_message.lower()) and 'meses' in user_message.lower():
                 months_analysis = self.analyze_last_months_performance(user_message)
