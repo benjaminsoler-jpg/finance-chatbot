@@ -385,6 +385,13 @@ class FinancialChatbot:
         elaboracion = elaboracion_match.group(1) + '-01-2025'
         meses = int(meses_match.group(1)) if meses_match else 3
         
+        # Extraer filtros adicionales
+        escenario = None
+        if 'moderado' in query.lower():
+            escenario = 'Moderado'
+        elif 'ambicion' in query.lower():
+            escenario = 'Ambicion'
+        
         # Calcular períodos anteriores
         mes_actual = int(elaboracion.split('-')[0])
         periodos = []
@@ -396,7 +403,10 @@ class FinancialChatbot:
         
         analysis = f"📊 **Rendimiento de los Últimos {meses} Meses**\n"
         analysis += f"🎯 **Elaboración base:** {elaboracion}\n"
-        analysis += f"📅 **Períodos analizados:** {', '.join(periodos)}\n\n"
+        analysis += f"📅 **Períodos analizados:** {', '.join(periodos)}\n"
+        if escenario:
+            analysis += f"🎯 **Escenario:** {escenario}\n"
+        analysis += "\n"
         
         # Variables clave para análisis
         variables_clave = ['Rate All In', 'Originacion Prom', 'Term', 'Risk Rate', 'Fund Rate']
@@ -406,11 +416,18 @@ class FinancialChatbot:
             
             valores_por_periodo = []
             for periodo in periodos:
-                data = self.df[
+                # Construir filtro base
+                filtro = (
                     (self.df['Elaboracion'] == elaboracion) & 
                     (self.df['Periodo'] == periodo) & 
                     (self.df['Concepto'] == variable)
-                ]
+                )
+                
+                # Agregar filtro de escenario si se especifica
+                if escenario:
+                    filtro = filtro & (self.df['Escenario'] == escenario)
+                
+                data = self.df[filtro]
                 
                 if len(data) > 0:
                     valor = data['Valor'].sum()
@@ -438,6 +455,37 @@ class FinancialChatbot:
                     analysis += f"  **Tendencia:** {tendencia} ({porcentaje:+.1f}%)\n"
             
             analysis += "\n"
+        
+        # Si se menciona "Resultado Comercial", agregar análisis por negocio
+        if 'resultado comercial' in query.lower():
+            analysis += "🏢 **Análisis por Negocio - Resultado Comercial:**\n"
+            
+            for negocio in self.df['Negocio'].unique():
+                if pd.isna(negocio):
+                    continue
+                    
+                analysis += f"\n📊 **{negocio}:**\n"
+                
+                for periodo in periodos:
+                    # Construir filtro para Resultado Comercial por negocio
+                    filtro = (
+                        (self.df['Elaboracion'] == elaboracion) & 
+                        (self.df['Periodo'] == periodo) & 
+                        (self.df['Concepto'] == 'Resultado Comercial') &
+                        (self.df['Negocio'] == negocio)
+                    )
+                    
+                    # Agregar filtro de escenario si se especifica
+                    if escenario:
+                        filtro = filtro & (self.df['Escenario'] == escenario)
+                    
+                    data = self.df[filtro]
+                    
+                    if len(data) > 0:
+                        valor = data['Valor'].sum()
+                        analysis += f"  - {periodo}: ${valor:,}\n"
+                    else:
+                        analysis += f"  - {periodo}: Sin datos\n"
         
         return analysis
     
@@ -703,7 +751,7 @@ class FinancialChatbot:
                         return comparison_analysis
             
             # Verificar si es una consulta de "últimos N meses"
-            if 'ultimos' in user_message.lower() and 'meses' in user_message.lower():
+            if ('ultimos' in user_message.lower() or 'ultimo' in user_message.lower()) and 'meses' in user_message.lower():
                 months_analysis = self.analyze_last_months_performance(user_message)
                 if months_analysis:
                     return months_analysis
