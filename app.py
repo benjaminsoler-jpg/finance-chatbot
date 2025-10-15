@@ -48,6 +48,12 @@ st.markdown("""
         background-color: #f3e5f5;
         border-left: 4px solid #9c27b0;
     }
+    .business-title {
+        font-size: 1.4em;
+        font-weight: bold;
+        margin: 15px 0 10px 0;
+        color: #2E86AB;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -425,7 +431,7 @@ class FinancialChatbot:
         negocios = ['PYME', 'CORP', 'Brokers', 'WK']
         
         for negocio in negocios:
-            analysis += f"🏢 **{negocio}:**\n\n"
+            analysis += f"<div class='business-title'>🏢 {negocio}</div>\n\n"
             
             # Primero mostrar rates (porcentajes)
             analysis += "  📊 **Rates (Porcentajes):**\n"
