@@ -837,63 +837,355 @@ class FinancialChatbot:
         # Ordenar cambios por magnitud
         cambios_significativos.sort(key=lambda x: abs(x['magnitud']), reverse=True)
         
-        # Storytelling principal
-        storytelling += f"🎯 **PERÍODO ANALIZADO:** {elaboracion} (Últimos 3 meses: {', '.join(periodos)})\n"
-        storytelling += f"🎯 **ESCENARIO:** {escenario}\n\n"
+        # Storytelling principal - Análisis experto en párrafos
+        storytelling += f"## 📊 **ANÁLISIS FINANCIERO EJECUTIVO**\n\n"
+        storytelling += f"**Período de Análisis:** {elaboracion} (Últimos 3 meses: {', '.join(periodos)})\n"
+        storytelling += f"**Escenario:** {escenario}\n\n"
         
-        # Cambios más importantes
-        storytelling += "🔥 **CAMBIOS MÁS IMPORTANTES (Último vs Primer Período):**\n"
-        for i, cambio in enumerate(cambios_significativos[:5]):  # Top 5
-            storytelling += f"{i+1}. <div class='variable-title'>**{cambio['variable']}**</div> en <div class='business-title'>**{cambio['negocio']}**</div>: "
-            if cambio['tipo'] == 'rate':
-                storytelling += f"{cambio['emoji']} {cambio['tendencia']} {abs(cambio['magnitud']):.2f}pp ({abs(cambio['porcentaje']):.1f}%)\n"
-            else:
-                storytelling += f"{cambio['emoji']} {cambio['tendencia']} ${abs(cambio['magnitud']):,.0f} ({abs(cambio['porcentaje']):.1f}%)\n"
-        
-        storytelling += "\n"
-        
-        # Análisis por negocio - solo un cambio por negocio
-        storytelling += "🏢 **ANÁLISIS POR NEGOCIO:**\n"
-        for negocio in negocios:
-            negocio_cambios = [c for c in cambios_significativos if c['negocio'] == negocio]
-            if negocio_cambios:
-                # Tomar solo el cambio más significativo por negocio
-                cambio_principal = max(negocio_cambios, key=lambda x: abs(x['magnitud']))
-                storytelling += f"\n<div class='business-title'>**{negocio}:**</div>\n"
-                if cambio_principal['tipo'] == 'rate':
-                    storytelling += f"  • <div class='variable-title'>**{cambio_principal['variable']}**</div>: {cambio_principal['emoji']} {cambio_principal['tendencia']} {abs(cambio_principal['magnitud']):.2f}pp\n"
-                else:
-                    storytelling += f"  • <div class='variable-title'>**{cambio_principal['variable']}**</div>: {cambio_principal['emoji']} {cambio_principal['tendencia']} ${abs(cambio_principal['magnitud']):,.0f}\n"
-        
-        storytelling += "\n"
-        
-        # Conclusiones y recomendaciones
-        storytelling += "💡 **CONCLUSIONES Y RECOMENDACIONES:**\n"
+        # Resumen ejecutivo
+        storytelling += "### 🎯 **RESUMEN EJECUTIVO**\n\n"
         
         # Analizar tendencias generales
         tendencias_positivas = [c for c in cambios_significativos if c['tendencia'] in ['subió', 'creció']]
         tendencias_negativas = [c for c in cambios_significativos if c['tendencia'] in ['bajó', 'decreció']]
         
         if len(tendencias_positivas) > len(tendencias_negativas):
-            storytelling += "✅ **Tendencia general positiva:** La mayoría de indicadores muestran mejoras.\n"
+            storytelling += "El análisis del período muestra una **tendencia general positiva** en la mayoría de los indicadores clave. Los resultados sugieren un desempeño sólido con mejoras significativas en varios segmentos de negocio.\n\n"
         elif len(tendencias_negativas) > len(tendencias_positivas):
-            storytelling += "⚠️ **Tendencia general negativa:** Varios indicadores muestran deterioro.\n"
+            storytelling += "El análisis revela una **tendencia general negativa** con deterioro en varios indicadores críticos. Esta situación requiere atención inmediata y revisión de estrategias operativas.\n\n"
         else:
-            storytelling += "⚖️ **Tendencia mixta:** Los indicadores muestran comportamiento diverso.\n"
+            storytelling += "El período presenta una **tendencia mixta** con comportamiento diverso entre indicadores. Mientras algunos segmentos muestran fortaleza, otros requieren intervención estratégica.\n\n"
         
-        # Recomendaciones específicas
-        if any(c['variable'] == 'Rate All In' and c['tendencia'] == 'subió' for c in cambios_significativos):
-            storytelling += "📈 **Rate All In en alza:** Considerar ajustes en pricing o estrategia comercial.\n"
+        # Análisis detallado por variable
+        if cambios_significativos:
+            storytelling += "### 📈 **ANÁLISIS DETALLADO POR VARIABLE**\n\n"
+            
+            # Agrupar por variable
+            variables_analisis = {}
+            for cambio in cambios_significativos:
+                if cambio['variable'] not in variables_analisis:
+                    variables_analisis[cambio['variable']] = []
+                variables_analisis[cambio['variable']].append(cambio)
+            
+            for variable, cambios_var in variables_analisis.items():
+                storytelling += f"#### <div class='variable-title'>**{variable}**</div>\n\n"
+                
+                if variable == 'Originacion Prom':
+                    storytelling += self._analyze_originacion_prom(cambios_var)
+                elif variable == 'Rate All In':
+                    storytelling += self._analyze_rate_all_in(cambios_var)
+                elif variable == 'Term':
+                    storytelling += self._analyze_term(cambios_var)
+                elif variable == 'Risk Rate':
+                    storytelling += self._analyze_risk_rate(cambios_var)
+                elif variable == 'Fund Rate':
+                    storytelling += self._analyze_fund_rate(cambios_var)
+                else:
+                    storytelling += self._analyze_generic_variable(variable, cambios_var)
+                
+                storytelling += "\n"
         
-        if any(c['variable'] == 'Churn Bruto' and c['tendencia'] == 'subió' for c in cambios_significativos):
-            storytelling += "⚠️ **Churn Bruto aumentando:** Revisar estrategias de retención de clientes.\n"
+        # Análisis por segmento de negocio
+        storytelling += "### 🏢 **ANÁLISIS POR SEGMENTO DE NEGOCIO**\n\n"
         
-        if any(c['variable'] == 'Originacion Prom' and c['tendencia'] == 'bajó' for c in cambios_significativos):
-            storytelling += "📉 **Originacion Prom disminuyendo:** Evaluar estrategias de adquisición.\n"
+        for negocio in negocios:
+            negocio_cambios = [c for c in cambios_significativos if c['negocio'] == negocio]
+            if negocio_cambios:
+                storytelling += f"#### <div class='business-title'>**{negocio}**</div>\n\n"
+                storytelling += self._analyze_business_segment(negocio, negocio_cambios)
+                storytelling += "\n"
+        
+        # Conclusiones y recomendaciones estratégicas
+        storytelling += "### 💡 **CONCLUSIONES Y RECOMENDACIONES ESTRATÉGICAS**\n\n"
+        storytelling += self._generate_strategic_recommendations(cambios_significativos)
         
         storytelling += "\n"
         
         return storytelling
+    
+    def _analyze_originacion_prom(self, cambios):
+        """Análisis experto de Originacion Prom"""
+        analysis = ""
+        
+        cambios_positivos = [c for c in cambios if c['tendencia'] == 'creció']
+        cambios_negativos = [c for c in cambios if c['tendencia'] == 'decreció']
+        
+        if cambios_negativos and not cambios_positivos:
+            analysis += "La **Originación Promedio** presenta un **deterioro generalizado** en todos los segmentos analizados. Esta caída sistemática en los volúmenes de originación sugiere desafíos estructurales en la capacidad de adquisición de nuevos clientes o en la retención de la cartera existente.\n\n"
+            
+            for cambio in cambios_negativos:
+                analysis += f"El segmento **{cambio['negocio']}** registra la mayor contracción con una reducción de ${abs(cambio['magnitud']):,.0f} ({abs(cambio['porcentaje']):.1f}%), lo que representa un **riesgo significativo** para la sostenibilidad del negocio en este segmento.\n\n"
+            
+            analysis += "**Implicaciones estratégicas:** Esta tendencia negativa requiere una revisión inmediata de las estrategias de adquisición, pricing y retención. Se recomienda un análisis profundo de la competencia y la propuesta de valor para identificar las causas raíz del deterioro.\n\n"
+            
+        elif cambios_positivos and not cambios_negativos:
+            analysis += "La **Originación Promedio** muestra un **crecimiento robusto** en todos los segmentos, indicando una estrategia de adquisición exitosa y una demanda saludable en el mercado.\n\n"
+            
+            for cambio in cambios_positivos:
+                analysis += f"El segmento **{cambio['negocio']}** destaca con un crecimiento de ${cambio['magnitud']:,.0f} ({cambio['porcentaje']:.1f}%), demostrando una **excelente penetración** en este nicho de mercado.\n\n"
+            
+            analysis += "**Implicaciones estratégicas:** Este crecimiento sostenido valida la estrategia actual y sugiere oportunidades para expandir la presencia en segmentos de alto rendimiento. Se recomienda capitalizar este momentum para acelerar el crecimiento.\n\n"
+            
+        else:
+            analysis += "La **Originación Promedio** presenta un **comportamiento mixto** entre segmentos, con algunos mostrando crecimiento mientras otros experimentan contracción.\n\n"
+            
+            for cambio in cambios:
+                if cambio['tendencia'] == 'creció':
+                    analysis += f"**{cambio['negocio']}** registra un crecimiento positivo de ${cambio['magnitud']:,.0f} ({cambio['porcentaje']:.1f}%), indicando fortaleza en este segmento.\n\n"
+                else:
+                    analysis += f"**{cambio['negocio']}** experimenta una contracción de ${abs(cambio['magnitud']):,.0f} ({abs(cambio['porcentaje']):.1f}%), requiriendo atención estratégica.\n\n"
+            
+            analysis += "**Implicaciones estratégicas:** Esta divergencia entre segmentos sugiere la necesidad de estrategias diferenciadas. Los segmentos en crecimiento deben recibir mayor inversión, mientras que los en contracción requieren intervención inmediata.\n\n"
+        
+        return analysis
+    
+    def _analyze_rate_all_in(self, cambios):
+        """Análisis experto de Rate All In"""
+        analysis = ""
+        
+        cambios_positivos = [c for c in cambios if c['tendencia'] == 'subió']
+        cambios_negativos = [c for c in cambios if c['tendencia'] == 'bajó']
+        
+        if cambios_positivos and not cambios_negativos:
+            analysis += "El **Rate All In** presenta una **tendencia alcista generalizada**, lo que indica una mejora en la rentabilidad por producto y una mayor eficiencia en la estructura de costos.\n\n"
+            
+            for cambio in cambios_positivos:
+                analysis += f"El segmento **{cambio['negocio']}** muestra la mayor mejora con un incremento de {cambio['magnitud']:.2f} puntos porcentuales ({cambio['porcentaje']:.1f}%), reflejando una **optimización exitosa** de la propuesta de valor.\n\n"
+            
+            analysis += "**Implicaciones estratégicas:** Esta mejora en rentabilidad valida las estrategias de pricing y optimización de costos. Se recomienda mantener esta tendencia mientras se evalúan oportunidades de crecimiento adicional.\n\n"
+            
+        elif cambios_negativos and not cambios_positivos:
+            analysis += "El **Rate All In** experimenta una **presión a la baja** en todos los segmentos, lo que sugiere desafíos en la sostenibilidad de la rentabilidad y posible erosión de márgenes.\n\n"
+            
+            for cambio in cambios_negativos:
+                analysis += f"El segmento **{cambio['negocio']}** registra la mayor contracción con una reducción de {abs(cambio['magnitud']):.2f} puntos porcentuales ({abs(cambio['porcentaje']):.1f}%), indicando **presión competitiva** significativa.\n\n"
+            
+            analysis += "**Implicaciones estratégicas:** Esta tendencia negativa requiere una revisión urgente de la estrategia de pricing y la estructura de costos. Se recomienda un análisis competitivo profundo y la implementación de medidas de optimización.\n\n"
+            
+        else:
+            analysis += "El **Rate All In** presenta un **comportamiento divergente** entre segmentos, con algunos mostrando mejoras mientras otros experimentan deterioro.\n\n"
+            
+            for cambio in cambios:
+                if cambio['tendencia'] == 'subió':
+                    analysis += f"**{cambio['negocio']}** registra una mejora de {cambio['magnitud']:.2f}pp ({cambio['porcentaje']:.1f}%), demostrando fortaleza en la gestión de rentabilidad.\n\n"
+                else:
+                    analysis += f"**{cambio['negocio']}** experimenta una reducción de {abs(cambio['magnitud']):.2f}pp ({abs(cambio['porcentaje']):.1f}%), requiriendo intervención estratégica.\n\n"
+            
+            analysis += "**Implicaciones estratégicas:** Esta divergencia sugiere la necesidad de estrategias de pricing diferenciadas por segmento. Los segmentos con mejoras deben servir como modelo para los que presentan deterioro.\n\n"
+        
+        return analysis
+    
+    def _analyze_term(self, cambios):
+        """Análisis experto de Term"""
+        analysis = ""
+        
+        cambios_positivos = [c for c in cambios if c['tendencia'] == 'subió']
+        cambios_negativos = [c for c in cambios if c['tendencia'] == 'bajó']
+        
+        if cambios_positivos and not cambios_negativos:
+            analysis += "El **Term** muestra una **tendencia alcista** en todos los segmentos, indicando una mayor duración promedio de los contratos y una mejora en la estabilidad de la cartera.\n\n"
+            
+            for cambio in cambios_positivos:
+                analysis += f"El segmento **{cambio['negocio']}** presenta la mayor mejora con un incremento de {cambio['magnitud']:.2f} puntos porcentuales ({cambio['porcentaje']:.1f}%), reflejando una **mayor lealtad del cliente** y una propuesta de valor más atractiva.\n\n"
+            
+            analysis += "**Implicaciones estratégicas:** Esta mejora en la duración de contratos sugiere una mayor satisfacción del cliente y una reducción del riesgo de churn. Se recomienda capitalizar esta tendencia para mejorar la predictibilidad de los ingresos.\n\n"
+            
+        elif cambios_negativos and not cambios_positivos:
+            analysis += "El **Term** experimenta una **tendencia a la baja** en todos los segmentos, lo que indica una reducción en la duración promedio de los contratos y posibles desafíos en la retención de clientes.\n\n"
+            
+            for cambio in cambios_negativos:
+                analysis += f"El segmento **{cambio['negocio']}** registra la mayor contracción con una reducción de {abs(cambio['magnitud']):.2f} puntos porcentuales ({abs(cambio['porcentaje']):.1f}%), sugiriendo **desafíos en la retención** y posible erosión de la propuesta de valor.\n\n"
+            
+            analysis += "**Implicaciones estratégicas:** Esta tendencia negativa requiere una revisión urgente de las estrategias de retención y la propuesta de valor. Se recomienda implementar programas de fidelización y mejorar la experiencia del cliente.\n\n"
+            
+        else:
+            analysis += "El **Term** presenta un **comportamiento mixto** entre segmentos, con algunos mostrando mejoras mientras otros experimentan deterioro.\n\n"
+            
+            for cambio in cambios:
+                if cambio['tendencia'] == 'subió':
+                    analysis += f"**{cambio['negocio']}** registra una mejora de {cambio['magnitud']:.2f}pp ({cambio['porcentaje']:.1f}%), indicando fortaleza en la retención de clientes.\n\n"
+                else:
+                    analysis += f"**{cambio['negocio']}** experimenta una reducción de {abs(cambio['magnitud']):.2f}pp ({abs(cambio['porcentaje']):.1f}%), requiriendo atención estratégica.\n\n"
+            
+            analysis += "**Implicaciones estratégicas:** Esta divergencia sugiere la necesidad de estrategias de retención diferenciadas por segmento. Los segmentos con mejoras deben servir como modelo para los que presentan deterioro.\n\n"
+        
+        return analysis
+    
+    def _analyze_risk_rate(self, cambios):
+        """Análisis experto de Risk Rate"""
+        analysis = ""
+        
+        cambios_positivos = [c for c in cambios if c['tendencia'] == 'subió']
+        cambios_negativos = [c for c in cambios if c['tendencia'] == 'bajó']
+        
+        if cambios_positivos and not cambios_negativos:
+            analysis += "El **Risk Rate** presenta una **tendencia alcista** en todos los segmentos, lo que indica un aumento en la percepción de riesgo y posibles desafíos en la calidad de la cartera.\n\n"
+            
+            for cambio in cambios_positivos:
+                analysis += f"El segmento **{cambio['negocio']}** muestra la mayor elevación con un incremento de {cambio['magnitud']:.2f} puntos porcentuales ({cambio['porcentaje']:.1f}%), sugiriendo **deterioro en la calidad crediticia** de este segmento.\n\n"
+            
+            analysis += "**Implicaciones estratégicas:** Esta tendencia alcista requiere una revisión urgente de los criterios de aprobación y las políticas de riesgo. Se recomienda implementar medidas de mitigación y fortalecer los procesos de evaluación crediticia.\n\n"
+            
+        elif cambios_negativos and not cambios_positivos:
+            analysis += "El **Risk Rate** muestra una **tendencia a la baja** en todos los segmentos, indicando una mejora en la calidad de la cartera y una mayor eficiencia en la gestión de riesgo.\n\n"
+            
+            for cambio in cambios_negativos:
+                analysis += f"El segmento **{cambio['negocio']}** presenta la mayor mejora con una reducción de {abs(cambio['magnitud']):.2f} puntos porcentuales ({abs(cambio['porcentaje']):.1f}%), reflejando una **excelente gestión de riesgo** y una cartera de mayor calidad.\n\n"
+            
+            analysis += "**Implicaciones estratégicas:** Esta mejora en la calidad de riesgo valida las estrategias de evaluación crediticia y gestión de cartera. Se recomienda mantener esta tendencia mientras se evalúan oportunidades de crecimiento con mayor apetito de riesgo.\n\n"
+            
+        else:
+            analysis += "El **Risk Rate** presenta un **comportamiento divergente** entre segmentos, con algunos mostrando mejoras mientras otros experimentan deterioro.\n\n"
+            
+            for cambio in cambios:
+                if cambio['tendencia'] == 'subió':
+                    analysis += f"**{cambio['negocio']}** registra un incremento de {cambio['magnitud']:.2f}pp ({cambio['porcentaje']:.1f}%), indicando mayor percepción de riesgo en este segmento.\n\n"
+                else:
+                    analysis += f"**{cambio['negocio']}** experimenta una reducción de {abs(cambio['magnitud']):.2f}pp ({abs(cambio['porcentaje']):.1f}%), demostrando mejor gestión de riesgo.\n\n"
+            
+            analysis += "**Implicaciones estratégicas:** Esta divergencia sugiere la necesidad de estrategias de riesgo diferenciadas por segmento. Los segmentos con mejoras deben servir como modelo para los que presentan deterioro.\n\n"
+        
+        return analysis
+    
+    def _analyze_fund_rate(self, cambios):
+        """Análisis experto de Fund Rate"""
+        analysis = ""
+        
+        cambios_positivos = [c for c in cambios if c['tendencia'] == 'subió']
+        cambios_negativos = [c for c in cambios if c['tendencia'] == 'bajó']
+        
+        if cambios_positivos and not cambios_negativos:
+            analysis += "El **Fund Rate** presenta una **tendencia alcista** en todos los segmentos, lo que indica un aumento en los costos de fondeo y posibles presiones en la estructura de financiamiento.\n\n"
+            
+            for cambio in cambios_positivos:
+                analysis += f"El segmento **{cambio['negocio']}** muestra la mayor elevación con un incremento de {cambio['magnitud']:.2f} puntos porcentuales ({cambio['porcentaje']:.1f}%), sugiriendo **mayores costos de financiamiento** para este segmento.\n\n"
+            
+            analysis += "**Implicaciones estratégicas:** Esta tendencia alcista requiere una revisión de la estrategia de fondeo y la estructura de financiamiento. Se recomienda diversificar las fuentes de financiamiento y optimizar la gestión de liquidez.\n\n"
+            
+        elif cambios_negativos and not cambios_positivos:
+            analysis += "El **Fund Rate** muestra una **tendencia a la baja** en todos los segmentos, indicando una mejora en la eficiencia del fondeo y una optimización de la estructura de financiamiento.\n\n"
+            
+            for cambio in cambios_negativos:
+                analysis += f"El segmento **{cambio['negocio']}** presenta la mayor mejora con una reducción de {abs(cambio['magnitud']):.2f} puntos porcentuales ({abs(cambio['porcentaje']):.1f}%), reflejando una **excelente gestión de fondeo** y menores costos de financiamiento.\n\n"
+            
+            analysis += "**Implicaciones estratégicas:** Esta mejora en los costos de fondeo valida las estrategias de financiamiento y optimización de liquidez. Se recomienda mantener esta tendencia mientras se evalúan oportunidades de crecimiento.\n\n"
+            
+        else:
+            analysis += "El **Fund Rate** presenta un **comportamiento divergente** entre segmentos, con algunos mostrando mejoras mientras otros experimentan deterioro.\n\n"
+            
+            for cambio in cambios:
+                if cambio['tendencia'] == 'subió':
+                    analysis += f"**{cambio['negocio']}** registra un incremento de {cambio['magnitud']:.2f}pp ({cambio['porcentaje']:.1f}%), indicando mayores costos de fondeo en este segmento.\n\n"
+                else:
+                    analysis += f"**{cambio['negocio']}** experimenta una reducción de {abs(cambio['magnitud']):.2f}pp ({abs(cambio['porcentaje']):.1f}%), demostrando mejor gestión de fondeo.\n\n"
+            
+            analysis += "**Implicaciones estratégicas:** Esta divergencia sugiere la necesidad de estrategias de fondeo diferenciadas por segmento. Los segmentos con mejoras deben servir como modelo para los que presentan deterioro.\n\n"
+        
+        return analysis
+    
+    def _analyze_generic_variable(self, variable, cambios):
+        """Análisis genérico para otras variables"""
+        analysis = ""
+        
+        cambios_positivos = [c for c in cambios if c['tendencia'] in ['subió', 'creció']]
+        cambios_negativos = [c for c in cambios if c['tendencia'] in ['bajó', 'decreció']]
+        
+        if cambios_positivos and not cambios_negativos:
+            analysis += f"La variable **{variable}** presenta una **tendencia positiva** en todos los segmentos analizados, indicando mejoras significativas en este indicador clave.\n\n"
+        elif cambios_negativos and not cambios_positivos:
+            analysis += f"La variable **{variable}** experimenta una **tendencia negativa** en todos los segmentos, lo que sugiere desafíos en este indicador crítico.\n\n"
+        else:
+            analysis += f"La variable **{variable}** presenta un **comportamiento mixto** entre segmentos, con algunos mostrando mejoras mientras otros experimentan deterioro.\n\n"
+        
+        for cambio in cambios:
+            if cambio['tendencia'] in ['subió', 'creció']:
+                if cambio['tipo'] == 'rate':
+                    analysis += f"El segmento **{cambio['negocio']}** registra una mejora de {cambio['magnitud']:.2f}pp ({cambio['porcentaje']:.1f}%), demostrando fortaleza en este indicador.\n\n"
+                else:
+                    analysis += f"El segmento **{cambio['negocio']}** presenta un crecimiento de ${cambio['magnitud']:,.0f} ({cambio['porcentaje']:.1f}%), indicando un desempeño sólido.\n\n"
+            else:
+                if cambio['tipo'] == 'rate':
+                    analysis += f"El segmento **{cambio['negocio']}** experimenta una reducción de {abs(cambio['magnitud']):.2f}pp ({abs(cambio['porcentaje']):.1f}%), requiriendo atención estratégica.\n\n"
+                else:
+                    analysis += f"El segmento **{cambio['negocio']}** registra una contracción de ${abs(cambio['magnitud']):,.0f} ({abs(cambio['porcentaje']):.1f}%), sugiriendo desafíos en este segmento.\n\n"
+        
+        return analysis
+    
+    def _analyze_business_segment(self, negocio, cambios):
+        """Análisis experto por segmento de negocio"""
+        analysis = ""
+        
+        if negocio == 'PYME':
+            analysis += "El segmento **PYME** representa el núcleo del negocio y su desempeño es crítico para la sostenibilidad operativa. "
+        elif negocio == 'CORP':
+            analysis += "El segmento **CORP** constituye el motor de crecimiento principal y su evolución impacta significativamente en los resultados consolidados. "
+        elif negocio == 'Brokers':
+            analysis += "El segmento **Brokers** actúa como un canal de distribución clave y su rendimiento refleja la eficiencia de las estrategias de canal. "
+        elif negocio == 'WK':
+            analysis += "El segmento **WK** representa una oportunidad de crecimiento emergente y su desarrollo es fundamental para la diversificación del negocio. "
+        
+        # Analizar el cambio más significativo
+        if cambios:
+            cambio_principal = max(cambios, key=lambda x: abs(x['magnitud']))
+            
+            if cambio_principal['tendencia'] in ['subió', 'creció']:
+                analysis += f"Los resultados muestran una **tendencia positiva** con mejoras significativas en {cambio_principal['variable']}, lo que sugiere una estrategia exitosa en este segmento.\n\n"
+            else:
+                analysis += f"Los resultados revelan una **tendencia negativa** con deterioro en {cambio_principal['variable']}, lo que indica la necesidad de intervención estratégica inmediata.\n\n"
+            
+            # Recomendaciones específicas por negocio
+            if negocio == 'PYME' and cambio_principal['tendencia'] in ['bajó', 'decreció']:
+                analysis += "**Recomendación estratégica:** Dado el carácter crítico del segmento PYME, se recomienda implementar un plan de acción inmediato que incluya revisión de pricing, optimización de procesos y fortalecimiento de la propuesta de valor.\n\n"
+            elif negocio == 'CORP' and cambio_principal['tendencia'] in ['subió', 'creció']:
+                analysis += "**Recomendación estratégica:** El crecimiento en CORP presenta una oportunidad para acelerar la expansión y replicar las mejores prácticas en otros segmentos.\n\n"
+            elif negocio == 'Brokers' and cambio_principal['tendencia'] in ['bajó', 'decreció']:
+                analysis += "**Recomendación estratégica:** El deterioro en Brokers requiere una revisión de la estrategia de canal y la implementación de medidas de apoyo para fortalecer la red de distribución.\n\n"
+            elif negocio == 'WK' and cambio_principal['tendencia'] in ['subió', 'creció']:
+                analysis += "**Recomendación estratégica:** El crecimiento en WK valida la estrategia de diversificación y sugiere oportunidades para expandir la presencia en este segmento emergente.\n\n"
+        
+        return analysis
+    
+    def _generate_strategic_recommendations(self, cambios_significativos):
+        """Generar recomendaciones estratégicas basadas en los cambios"""
+        recommendations = ""
+        
+        # Analizar patrones generales
+        variables_negativas = set()
+        variables_positivas = set()
+        
+        for cambio in cambios_significativos:
+            if cambio['tendencia'] in ['bajó', 'decreció']:
+                variables_negativas.add(cambio['variable'])
+            else:
+                variables_positivas.add(cambio['variable'])
+        
+        # Recomendaciones basadas en patrones
+        if 'Originacion Prom' in variables_negativas:
+            recommendations += "**1. Estrategia de Adquisición:** La contracción en Originación Promedio requiere una revisión integral de las estrategias de adquisición. Se recomienda implementar campañas de marketing dirigidas, optimizar los procesos de onboarding y fortalecer la propuesta de valor diferenciada.\n\n"
+        
+        if 'Rate All In' in variables_negativas:
+            recommendations += "**2. Optimización de Rentabilidad:** El deterioro en Rate All In sugiere presiones en la rentabilidad. Se recomienda revisar la estructura de costos, optimizar los procesos operativos y evaluar ajustes en la estrategia de pricing.\n\n"
+        
+        if 'Term' in variables_negativas:
+            recommendations += "**3. Retención de Clientes:** La reducción en Term indica desafíos en la retención. Se recomienda implementar programas de fidelización, mejorar la experiencia del cliente y desarrollar estrategias de upselling y cross-selling.\n\n"
+        
+        if 'Risk Rate' in variables_positivas:
+            recommendations += "**4. Gestión de Riesgo:** La mejora en Risk Rate valida las estrategias de evaluación crediticia. Se recomienda mantener esta tendencia mientras se evalúan oportunidades de crecimiento con mayor apetito de riesgo controlado.\n\n"
+        
+        if 'Fund Rate' in variables_positivas:
+            recommendations += "**5. Optimización de Fondeo:** La mejora en Fund Rate indica una gestión eficiente del financiamiento. Se recomienda capitalizar esta ventaja competitiva para impulsar el crecimiento sostenible.\n\n"
+        
+        # Recomendaciones generales
+        if len(variables_negativas) > len(variables_positivas):
+            recommendations += "**6. Plan de Recuperación:** Dado el predominio de tendencias negativas, se recomienda implementar un plan de recuperación integral que incluya revisión de estrategias, optimización de procesos y fortalecimiento de capacidades operativas.\n\n"
+        elif len(variables_positivas) > len(variables_negativas):
+            recommendations += "**6. Aceleración del Crecimiento:** El predominio de tendencias positivas presenta una oportunidad para acelerar el crecimiento. Se recomienda capitalizar este momentum para expandir la presencia en segmentos de alto rendimiento.\n\n"
+        else:
+            recommendations += "**6. Estrategia Diferenciada:** La naturaleza mixta de los resultados sugiere la necesidad de estrategias diferenciadas por segmento. Se recomienda desarrollar planes de acción específicos para cada área de negocio.\n\n"
+        
+        recommendations += "**7. Monitoreo Continuo:** Se recomienda implementar un sistema de monitoreo en tiempo real para detectar cambios tempranos en los indicadores clave y permitir una respuesta ágil a las condiciones del mercado.\n\n"
+        
+        return recommendations
     
     def _get_significant_rate_changes(self, variable, elaboracion, periodos, escenario, negocios):
         """Obtener cambios significativos en rates (>0.1pp)"""
