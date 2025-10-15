@@ -425,8 +425,51 @@ class FinancialChatbot:
             analysis += f"🎯 **Escenario:** {escenario}\n"
         analysis += "\n"
         
-        # Variables clave para análisis
-        variables_clave = ['Rate All In', 'Originacion Prom', 'Term', 'Risk Rate', 'Fund Rate']
+        # Extraer concepto específico si se menciona
+        concepto_match = re.search(r'(resultado comercial|originacion|gross revenue|interest revenue|margen financiero|cost of fund|ad revenue|cost of risk|clientes|churn|term|ad rate|int rate|fund rate|rate all in|ntr|risk rate|spread)', query.lower())
+        if concepto_match:
+            concepto_especifico = concepto_match.group(1).title()
+            if concepto_especifico == 'Resultado Comercial':
+                variables_clave = ['Resultado Comercial']
+            elif concepto_especifico == 'Originacion':
+                variables_clave = ['Originacion Prom']
+            elif concepto_especifico == 'Gross Revenue':
+                variables_clave = ['Gross Revenue']
+            elif concepto_especifico == 'Interest Revenue':
+                variables_clave = ['Interest Revenue']
+            elif concepto_especifico == 'Margen Financiero':
+                variables_clave = ['Margen Financiero']
+            elif concepto_especifico == 'Cost Of Fund':
+                variables_clave = ['Cost of Fund']
+            elif concepto_especifico == 'Ad Revenue':
+                variables_clave = ['AD Revenue']
+            elif concepto_especifico == 'Cost Of Risk':
+                variables_clave = ['Cost of Risk']
+            elif concepto_especifico == 'Clientes':
+                variables_clave = ['Clientes']
+            elif concepto_especifico == 'Churn':
+                variables_clave = ['Churn Bruto']
+            elif concepto_especifico == 'Term':
+                variables_clave = ['Term']
+            elif concepto_especifico == 'Ad Rate':
+                variables_clave = ['AD Rate']
+            elif concepto_especifico == 'Int Rate':
+                variables_clave = ['Int Rate']
+            elif concepto_especifico == 'Fund Rate':
+                variables_clave = ['Fund Rate']
+            elif concepto_especifico == 'Rate All In':
+                variables_clave = ['Rate All In']
+            elif concepto_especifico == 'Ntr':
+                variables_clave = ['NTR']
+            elif concepto_especifico == 'Risk Rate':
+                variables_clave = ['Risk Rate']
+            elif concepto_especifico == 'Spread':
+                variables_clave = ['Spread']
+            else:
+                variables_clave = ['Rate All In', 'Originacion Prom', 'Term', 'Risk Rate', 'Fund Rate']
+        else:
+            # Variables clave para análisis (default)
+            variables_clave = ['Rate All In', 'Originacion Prom', 'Term', 'Risk Rate', 'Fund Rate']
         
         # Variables que son rates (porcentajes) - no se suman, se muestran por clasificación/cohort
         rate_variables = ['Rate All In', 'Risk Rate', 'Fund Rate', 'Term']
@@ -448,10 +491,41 @@ class FinancialChatbot:
         for negocio in negocios:
             analysis += f"<div class='business-title'>🏢 {negocio}</div>\n\n"
             
-            # Primero mostrar rates (porcentajes)
-            analysis += "  📊 **Rates (Porcentajes):**\n"
-            for variable in rate_variables:
-                analysis += f"    📈 **{variable}:**\n"
+            # Si se especificó un concepto específico, mostrar solo ese
+            if len(variables_clave) == 1 and variables_clave[0] in ['Resultado Comercial', 'Gross Revenue', 'Interest Revenue', 'Margen Financiero', 'Cost of Fund', 'AD Revenue', 'Cost of Risk', 'Clientes', 'Churn Bruto', 'NTR', 'Spread']:
+                variable = variables_clave[0]
+                analysis += f"💰 **Valores Monetarios:**\n"
+                analysis += f"📈 **{variable}:**\n"
+                
+                valores_por_periodo = []
+                for periodo in periodos:
+                    valor = self._get_monetary_value(variable, elaboracion, periodo, escenario, negocio)
+                    if valor is not None:
+                        analysis += f"• {periodo}: ${valor:,.0f}\n"
+                        valores_por_periodo.append(valor)
+                    else:
+                        analysis += f"• {periodo}: No hay datos disponibles\n"
+                
+                # Calcular tendencia
+                if len(valores_por_periodo) >= 2:
+                    primer_valor = valores_por_periodo[-1]  # Más antiguo
+                    ultimo_valor = valores_por_periodo[0]   # Más reciente
+                    
+                    if primer_valor != 0:
+                        cambio_porcentaje = ((ultimo_valor - primer_valor) / primer_valor) * 100
+                        if cambio_porcentaje > 0:
+                            analysis += f"**Tendencia:** 📈 Creciendo (+{cambio_porcentaje:.1f}%)\n"
+                        else:
+                            analysis += f"**Tendencia:** 📉 Decreciendo ({cambio_porcentaje:.1f}%)\n"
+                
+                analysis += "\n---\n\n"
+            else:
+                # Lógica original para múltiples variables
+                # Primero mostrar rates (porcentajes)
+                analysis += "  📊 **Rates (Porcentajes):**\n"
+                for variable in rate_variables:
+                    if variable in variables_clave:
+                        analysis += f"    📈 **{variable}:**\n"
                 
                 for periodo in periodos:
                     # Construir filtro base
@@ -484,10 +558,11 @@ class FinancialChatbot:
                         analysis += f"      • {periodo}: Sin datos\n"
                 analysis += "\n"
             
-            # Luego mostrar variables monetarias
-            analysis += "  💰 **Valores Monetarios:**\n"
-            for variable in sum_variables:
-                analysis += f"    📈 **{variable}:**\n"
+                # Luego mostrar variables monetarias
+                analysis += "  💰 **Valores Monetarios:**\n"
+                for variable in sum_variables:
+                    if variable in variables_clave:
+                        analysis += f"    📈 **{variable}:**\n"
                 
                 valores_por_periodo = []
                 for periodo in periodos:
@@ -531,7 +606,7 @@ class FinancialChatbot:
                         analysis += f"      **Tendencia:** {tendencia} ({porcentaje:+.1f}%)\n"
                 analysis += "\n"
             
-            analysis += "---\n\n"
+                analysis += "---\n\n"
         
         # Obtener cambios significativos para análisis y visualizaciones
         cambios_significativos = []
