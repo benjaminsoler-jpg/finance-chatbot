@@ -1612,9 +1612,7 @@ class FinancialChatbot:
                             if escenario:
                                 data = data[data['Escenario'] == escenario]
                             
-                            # DEBUG: Agregar información de debug
                             analysis += f"    • {periodo}:\n"
-                            analysis += f"      [DEBUG] Registros encontrados: {len(data)}\n"
                             
                             if len(data) > 0:
                                 # Agrupar por cohort y mostrar valores
@@ -1675,47 +1673,47 @@ class FinancialChatbot:
                 for variable in sum_variables:
                     if variable in variables_clave:
                         analysis += f"    📈 **{variable}:**\n"
-                
-                valores_por_periodo = []
-                for periodo in periodos:
-                    # Construir filtro base
-                    filtro = (
-                        (self.df['Elaboracion'] == elaboracion) & 
-                        (self.df['Periodo'] == periodo) & 
-                        (self.df['Concepto'] == variable) &
-                        (self.df['Negocio'] == negocio)
-                    )
-                    
-                    # Agregar filtro de escenario si se especifica
-                    if escenario:
-                        filtro = filtro & (self.df['Escenario'] == escenario)
-                    
-                    data = self.df[filtro]
-                    
-                    if len(data) > 0:
-                        valor = data['Valor'].sum()
-                        valores_por_periodo.append(valor)
-                        analysis += f"      • {periodo}: ${valor:,.0f}\n"
-                    else:
-                        analysis += f"      • {periodo}: Sin datos\n"
-                
-                if len(valores_por_periodo) > 1:
-                    # Calcular tendencia
-                    primer_valor = valores_por_periodo[0]
-                    ultimo_valor = valores_por_periodo[-1]
-                    
-                    if primer_valor != 0:
-                        cambio = ultimo_valor - primer_valor
-                        porcentaje = (cambio / primer_valor) * 100
                         
-                        if cambio > 0:
-                            tendencia = "📈 Creciendo"
-                        elif cambio < 0:
-                            tendencia = "📉 Decreciendo"
-                        else:
-                            tendencia = "➡️ Estable"
+                        valores_por_periodo = []
+                        for periodo in periodos:
+                            # Construir filtro base
+                            filtro = (
+                                (self.df['Elaboracion'] == elaboracion) & 
+                                (self.df['Periodo'] == periodo) & 
+                                (self.df['Concepto'] == variable) &
+                                (self.df['Negocio'] == negocio)
+                            )
+                            
+                            # Agregar filtro de escenario si se especifica
+                            if escenario:
+                                filtro = filtro & (self.df['Escenario'] == escenario)
+                            
+                            data = self.df[filtro]
+                            
+                            if len(data) > 0:
+                                valor = data['Valor'].sum()
+                                valores_por_periodo.append(valor)
+                                analysis += f"      • {periodo}: ${valor:,.0f}\n"
+                            else:
+                                analysis += f"      • {periodo}: Sin datos\n"
                         
-                        analysis += f"      **Tendencia:** {tendencia} ({porcentaje:+.1f}%)\n"
+                        if len(valores_por_periodo) > 1:
+                            # Calcular tendencia
+                            primer_valor = valores_por_periodo[0]
+                            ultimo_valor = valores_por_periodo[-1]
+                            
+                            if primer_valor != 0:
+                                cambio = ultimo_valor - primer_valor
+                                porcentaje = (cambio / primer_valor) * 100
+                                
+                                if cambio > 0:
+                                    tendencia = "📈 Creciendo"
+                                elif cambio < 0:
+                                    tendencia = "📉 Decreciendo"
+                                else:
+                                    tendencia = "➡️ Estable"
+                                
+                                analysis += f"      **Tendencia:** {tendencia} ({porcentaje:+.1f}%)\n"
                 analysis += "\n"
             
                 analysis += "---\n\n"
