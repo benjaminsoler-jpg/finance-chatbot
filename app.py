@@ -2527,9 +2527,11 @@ class FinancialChatbot:
         """Generar visualizaciones específicas para análisis de últimos meses"""
         if not cambios_significativos:
             st.info("ℹ️ No hay cambios significativos para visualizar.")
+            st.info(f"DEBUG: cambios_significativos = {len(cambios_significativos) if cambios_significativos else 0}")
             return
         
         st.markdown("📊 **VISUALIZACIONES INTERACTIVAS:**")
+        st.info(f"DEBUG: Generando {len(cambios_significativos)} cambios significativos")
         
         # 1. Gráfico de tendencias temporales por variable
         st.markdown("**Gráfico 1: Tendencias Temporales por Variable**")
