@@ -107,7 +107,7 @@ class FinancialChatbot:
             self.df.columns = self.df.columns.str.strip()
             
             # Convertir columna Valor a numérico, manejando comas, % y valores nulos
-            self.df['Valor'] = self.df['Valor'].astype(str).str.replace(',', '')
+            # NO eliminar comas aquí - se manejan en convert_percentage
             
             # Detectar si el valor ya está en formato porcentaje (contiene %)
             def convert_percentage(value_str):
@@ -116,6 +116,9 @@ class FinancialChatbot:
                 # Manejar casos especiales
                 if value_str in ['#DIV/0!', '#VALUE!', '#N/A', 'N/A', '', 'nan', 'NaN']:
                     return 0.0
+                
+                # Eliminar comas de separadores de miles
+                value_str = value_str.replace(',', '')
                 
                 if '%' in value_str:
                     # Si tiene %, convertir de porcentaje a decimal
