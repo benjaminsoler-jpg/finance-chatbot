@@ -1654,20 +1654,7 @@ class FinancialChatbot:
                     
                     data = self.df[filtro]
                     
-                    if len(data) > 0:
-                        analysis += f"      • {periodo}:\n"
-                        # Agrupar por clasificación y cohort
-                        grouped = data.groupby(['Clasificación', 'Cohort_Act'])['Valor'].first().reset_index()
-                        for _, row in grouped.iterrows():
-                            clasificacion = row['Clasificación'] if pd.notna(row['Clasificación']) else 'Sin clasificación'
-                            cohort = row['Cohort_Act'] if pd.notna(row['Cohort_Act']) else 'Sin cohort'
-                            valor = row['Valor']
-                            if variable == 'Term':
-                                analysis += f"        - {clasificacion} ({cohort}): {valor:.0f}\n"
-                            else:
-                                analysis += f"        - {clasificacion} ({cohort}): {valor*100:.2f}%\n"
-                    else:
-                        analysis += f"      • {periodo}: Sin datos\n"
+                    # Esta sección está duplicada - se elimina para evitar redundancia
                 analysis += "\n"
             
                 # Luego mostrar variables monetarias
@@ -1759,6 +1746,7 @@ class FinancialChatbot:
         if cambios_significativos:
             analysis += "---\n\n"
             analysis += "## 📊 **VISUALIZACIONES INTERACTIVAS**\n\n"
+            # Debug marker para generar gráficos (no visible al usuario)
             analysis += "**GENERATE_LAST_MONTHS_CHARTS:**\n"
             analysis += f"elaboracion={elaboracion}\n"
             analysis += f"periodos={periodos}\n"
