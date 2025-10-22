@@ -303,6 +303,130 @@ class FinancialChatbot:
         query_lower = query.lower()
         return any(keyword in query_lower for keyword in financial_keywords)
     
+    def is_single_variable_query(self, query: str) -> bool:
+        """Detectar si es una consulta específica de una sola variable"""
+        single_variable_patterns = [
+            r'dame\s+la\s+rate\s+all\s+in',
+            r'dame\s+el\s+rate\s+all\s+in',
+            r'muestra\s+la\s+rate\s+all\s+in',
+            r'muestra\s+el\s+rate\s+all\s+in',
+            r'cuanto\s+es\s+la\s+rate\s+all\s+in',
+            r'cuanto\s+es\s+el\s+rate\s+all\s+in',
+            r'valor\s+de\s+la\s+rate\s+all\s+in',
+            r'valor\s+del\s+rate\s+all\s+in'
+        ]
+        
+        query_lower = query.lower()
+        return any(re.search(pattern, query_lower) for pattern in single_variable_patterns)
+    
+    def analyze_single_variable(self, query: str) -> str:
+        """Análisis específico para una sola variable"""
+        import re
+        
+        # Extraer filtros de la consulta
+        elaboracion = None
+        periodo = None
+        negocio = None
+        escenario = None
+        concepto = None
+        
+        # Buscar elaboración
+        elaboracion_match = re.search(r'elaboraci[oó]n\s+(\d{2})-01-2025', query.lower())
+        if elaboracion_match:
+            elaboracion = elaboracion_match.group(1) + '-01-2025'
+        
+        # Buscar período
+        periodo_match = re.search(r'periodo\s+(\d{2})-01-2025', query.lower())
+        if periodo_match:
+            periodo = periodo_match.group(1) + '-01-2025'
+        
+        # Buscar negocio
+        if 'pyme' in query.lower():
+            negocio = 'PYME'
+        elif 'corp' in query.lower():
+            negocio = 'CORP'
+        elif 'brokers' in query.lower():
+            negocio = 'Brokers'
+        elif 'wk' in query.lower():
+            negocio = 'WK'
+        
+        # Buscar escenario
+        if 'moderado' in query.lower():
+            escenario = 'Moderado'
+        elif 'ambicion' in query.lower():
+            escenario = 'Ambicion'
+        
+        # Buscar concepto específico
+        if 'rate all in' in query.lower():
+            concepto = 'Rate All In'
+        elif 'risk rate' in query.lower():
+            concepto = 'Risk Rate'
+        elif 'fund rate' in query.lower():
+            concepto = 'Fund Rate'
+        elif 'originacion' in query.lower():
+            concepto = 'Originacion'
+        elif 'new active' in query.lower():
+            concepto = 'New Active'
+        elif 'churn bruto' in query.lower():
+            concepto = 'Churn Bruto'
+        
+        # Construir filtro
+        filtro = self.df.copy()
+        
+        if elaboracion:
+            filtro = filtro[filtro['Elaboracion'] == elaboracion]
+        if periodo:
+            filtro = filtro[filtro['Periodo'] == periodo]
+        if negocio:
+            filtro = filtro[filtro['Negocio'] == negocio]
+        if escenario:
+            filtro = filtro[filtro['Escenario'] == escenario]
+        if concepto:
+            filtro = filtro[filtro['Concepto'] == concepto]
+        
+        if len(filtro) == 0:
+            return f"❌ No se encontraron datos para {concepto or 'la variable solicitada'} con los filtros especificados."
+        
+        # Generar respuesta específica
+        analysis = f"📊 **Consulta Específica: {concepto or 'Variable'}**\n\n"
+        
+        # Mostrar filtros aplicados
+        analysis += "🔍 **Filtros aplicados:**\n"
+        if elaboracion:
+            analysis += f"- Elaboración: {elaboracion}\n"
+        if periodo:
+            analysis += f"- Período: {periodo}\n"
+        if negocio:
+            analysis += f"- Negocio: {negocio}\n"
+        if escenario:
+            analysis += f"- Escenario: {escenario}\n"
+        if concepto:
+            analysis += f"- Concepto: {concepto}\n"
+        
+        analysis += f"\n📈 **Resultados:**\n"
+        
+        # Mostrar datos por cohort
+        if concepto in ['Rate All In', 'Risk Rate', 'Fund Rate', 'Term']:
+            # Para rates, mostrar por cohort
+            cohort_data = filtro.groupby('Cohort_Act')['Valor'].first()
+            for cohort, valor in cohort_data.items():
+                if pd.isna(cohort):
+                    cohort_name = "Sin Cohort"
+                else:
+                    cohort_name = str(cohort)
+                
+                if concepto == 'Term':
+                    analysis += f"- {cohort_name}: {valor:.0f}\n"
+                else:  # Rates
+                    analysis += f"- {cohort_name}: {valor*100:.2f}%\n"
+        else:
+            # Para variables monetarias, mostrar suma total
+            total = filtro['Valor'].sum()
+            analysis += f"- Valor total: ${total:,.0f}\n"
+            analysis += f"- Registros: {len(filtro)}\n"
+        
+        return analysis
+    
     def analyze_performance_comparison(self, query: str) -> str:
         """Análisis de comparación de rendimiento: predicción vs realidad"""
         import re
@@ -1473,6 +1597,47 @@ class FinancialChatbot:
                 for variable in rate_variables:
                     if variable in variables_clave:
                         analysis += f"    📈 **{variable}:**\n"
+                        
+                        # Mostrar datos por período y cohort
+                        for periodo in periodos:
+                            # Obtener datos para este período
+                            data = self.df[
+                                (self.df['Elaboracion'] == elaboracion) & 
+                                (self.df['Periodo'] == periodo) & 
+                                (self.df['Concepto'] == variable) &
+                                (self.df['Negocio'] == negocio)
+                            ]
+                            
+                            # Agregar filtro de escenario si se especifica
+                            if escenario:
+                                data = data[data['Escenario'] == escenario]
+                            
+                            # DEBUG: Agregar información de debug
+                            analysis += f"    • {periodo}:\n"
+                            analysis += f"      [DEBUG] Registros encontrados: {len(data)}\n"
+                            
+                            if len(data) > 0:
+                                # Agrupar por cohort y mostrar valores
+                                cohort_data = data.groupby('Cohort_Act')['Valor'].first()
+                                for cohort, valor in cohort_data.items():
+                                    # Manejar cohorts nulos
+                                    if pd.isna(cohort):
+                                        cohort_name = "Sin Cohort"
+                                    else:
+                                        cohort_name = str(cohort)
+                                    
+                                    # Formatear según el tipo de variable
+                                    if variable == 'Term':
+                                        # Term es un número entero
+                                        analysis += f"      - {cohort_name}: {valor:.0f}\n"
+                                    elif variable in ['Rate All In', 'Risk Rate', 'Fund Rate']:
+                                        # Rates son porcentajes
+                                        analysis += f"      - {cohort_name}: {valor*100:.2f}%\n"
+                                    else:
+                                        # Otras variables (por si acaso)
+                                        analysis += f"      - {cohort_name}: {valor:.2f}\n"
+                            else:
+                                analysis += f"      - No hay datos disponibles\n"
                 
                 for periodo in periodos:
                     # Construir filtro base
@@ -1866,7 +2031,7 @@ class FinancialChatbot:
         return analysis
     
     def _generate_storytelling(self, elaboracion, periodos, escenario, negocios):
-        """Generar storytelling completo del rendimiento con formato elegante"""
+        """Generar storytelling elegante y profesional en un párrafo estético"""
         storytelling = "📖 **ANÁLISIS FINANCIERO EJECUTIVO**\n\n"
         
         # Obtener datos para análisis
@@ -1898,17 +2063,68 @@ class FinancialChatbot:
         # Header elegante
         storytelling += f"**📅 Período:** {elaboracion} | **🎯 Escenario:** {escenario} | **📊 Meses:** {len(periodos)}\n\n"
         
-        # Resumen ejecutivo elegante
-        storytelling += self._generate_executive_summary(cambios_significativos)
+        # Analizar tendencia general
+        cambios_positivos = [c for c in cambios_significativos if c['tendencia'] in ['creció', 'subió']]
+        cambios_negativos = [c for c in cambios_significativos if c['tendencia'] in ['decreció', 'bajó']]
         
-        # Análisis por variable (top 3) con formato elegante
-        storytelling += self._generate_variable_analysis(cambios_significativos)
+        if len(cambios_negativos) > len(cambios_positivos):
+            tendencia_general = "**tendencia general negativa**"
+            contexto = "deterioro en varios indicadores críticos que requiere **atención inmediata** y revisión de estrategias operativas"
+        elif len(cambios_positivos) > len(cambios_negativos):
+            tendencia_general = "**tendencia general positiva**"
+            contexto = "mejoras en múltiples indicadores clave que valida las estrategias implementadas y sugiere **oportunidades de crecimiento**"
+        else:
+            tendencia_general = "**tendencia general mixta**"
+            contexto = "resultados mixtos entre segmentos que requiere **análisis granular** y estrategias diferenciadas por área de negocio"
         
-        # Análisis por segmento con formato elegante
-        storytelling += self._generate_business_analysis(cambios_significativos)
+        # Top 3 cambios más críticos
+        top_cambios = cambios_significativos[:3]
         
-        # Recomendaciones estratégicas elegantes
-        storytelling += self._generate_strategic_recommendations_elegant(cambios_significativos)
+        # Generar párrafo estético
+        storytelling += f"El análisis de rendimiento para el período **{elaboracion}** en escenario **{escenario}** revela una {tendencia_general} con {contexto}. "
+        
+        # Analizar por segmento
+        analisis_por_negocio = []
+        for negocio in negocios:
+            cambios_negocio = [c for c in cambios_significativos if c['negocio'] == negocio]
+            if cambios_negocio:
+                cambios_pos_negocio = [c for c in cambios_negocio if c['tendencia'] in ['creció', 'subió']]
+                cambios_neg_negocio = [c for c in cambios_negocio if c['tendencia'] in ['decreció', 'bajó']]
+                
+                if len(cambios_neg_negocio) > len(cambios_pos_negocio):
+                    tendencia_negocio = "**deterioro**"
+                elif len(cambios_pos_negocio) > len(cambios_neg_negocio):
+                    tendencia_negocio = "**crecimiento**"
+                else:
+                    tendencia_negocio = "**comportamiento mixto**"
+                
+                # Cambio más significativo del negocio
+                cambio_principal = max(cambios_negocio, key=lambda x: abs(x['magnitud']))
+                if cambio_principal['tipo'] == 'rate':
+                    if cambio_principal['magnitud'] > 0:
+                        cambio_texto = f"**{cambio_principal['variable']}** mejoró +{abs(cambio_principal['magnitud']):.2f}pp"
+                    else:
+                        cambio_texto = f"**{cambio_principal['variable']}** se deterioró {cambio_principal['magnitud']:.2f}pp"
+                else:
+                    if cambio_principal['magnitud'] > 0:
+                        cambio_texto = f"**{cambio_principal['variable']}** creció +${abs(cambio_principal['magnitud']):,.0f}"
+                    else:
+                        cambio_texto = f"**{cambio_principal['variable']}** decreció ${cambio_principal['magnitud']:,.0f}"
+                
+                analisis_por_negocio.append(f"**{negocio}** muestra {tendencia_negocio} con {cambio_texto}")
+        
+        if analisis_por_negocio:
+            storytelling += "Por segmento, " + ", ".join(analisis_por_negocio) + ". "
+        
+        # Recomendaciones estratégicas
+        if len(cambios_negativos) > len(cambios_positivos):
+            storytelling += "Se recomienda **revisión urgente** de las estrategias operativas, **implementación de medidas de apoyo** para segmentos en deterioro, y **desarrollo de planes de recuperación** específicos por área de negocio. "
+        elif len(cambios_positivos) > len(cambios_negativos):
+            storytelling += "Se recomienda **capitalizar el momentum positivo**, **replicar las mejores prácticas** en segmentos exitosos, y **acelerar la expansión** en áreas de crecimiento. "
+        else:
+            storytelling += "Se recomienda **análisis granular** por segmento, **estrategias diferenciadas** según el comportamiento específico, y **monitoreo continuo** para optimizar el rendimiento. "
+        
+        storytelling += "La implementación de **monitoreo en tiempo real** y **alertas automáticas** permitirá una **respuesta ágil** a las condiciones del mercado, mientras que el desarrollo de **modelos predictivos más granulares** mejorará la precisión de las proyecciones futuras."
         
         return storytelling
     
@@ -3795,7 +4011,13 @@ class FinancialChatbot:
         
         # Si es financiera, intentar análisis especializados primero
         if is_financial:
-            # Verificar si es una consulta de comparación rolling específica (PRIORIDAD MÁS ALTA)
+            # Verificar si es una consulta específica de una sola variable (PRIORIDAD MÁS ALTA)
+            if self.is_single_variable_query(user_message):
+                single_analysis = self.analyze_single_variable(user_message)
+                if single_analysis:
+                    return single_analysis
+            
+            # Verificar si es una consulta de comparación rolling específica (PRIORIDAD ALTA)
             if 'comparame' in user_message.lower() and 'periodos' in user_message.lower() and 'elaboracion' in user_message.lower():
                 rolling_analysis = self.analyze_rolling_comparison(user_message)
                 if rolling_analysis:
@@ -3976,9 +4198,11 @@ def main():
                         params['escenario']
                     )
                 else:
-                    # Convertir saltos de línea a <br> para HTML
-                    content_html = message["content"].replace('\n', '<br>')
-                    st.markdown(f'<div class="chat-message bot-message">🤖 **Bot:** {content_html}</div>', unsafe_allow_html=True)
+                    # Renderizar markdown correctamente
+                    st.markdown("🤖 **Bot:**")
+                    # Procesar el contenido para convertir **texto** a markdown
+                    content = message["content"]
+                    st.markdown(content)
     
     # Input de usuario
     user_input = st.text_input("Escribe tu consulta:", key="user_input")
