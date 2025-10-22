@@ -305,6 +305,8 @@ class FinancialChatbot:
     
     def is_single_variable_query(self, query: str) -> bool:
         """Detectar si es una consulta específica de una sola variable"""
+        import re
+        
         single_variable_patterns = [
             r'dame\s+la\s+rate\s+all\s+in',
             r'dame\s+el\s+rate\s+all\s+in',
