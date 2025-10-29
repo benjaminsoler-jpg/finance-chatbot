@@ -2093,19 +2093,19 @@ class FinancialChatbot:
                 cambio_principal = max(cambios_negocio, key=lambda x: abs(x['magnitud']))
                 if cambio_principal['tipo'] == 'rate':
                     if cambio_principal['magnitud'] > 0:
-                        cambio_texto = f"**{cambio_principal['variable']}** mejoró +{abs(cambio_principal['magnitud']):.2f}pp"
+                        cambio_texto = f"**{cambio_principal['variable']}** creció +{abs(cambio_principal['magnitud']):.2f}pp"
                     else:
-                        cambio_texto = f"**{cambio_principal['variable']}** se deterioró {cambio_principal['magnitud']:.2f}pp"
+                        cambio_texto = f"**{cambio_principal['variable']}** decreció {abs(cambio_principal['magnitud']):.2f}pp"
                 else:
                     if cambio_principal['magnitud'] > 0:
                         cambio_texto = f"**{cambio_principal['variable']}** creció +${abs(cambio_principal['magnitud']):,.0f}"
                     else:
-                        cambio_texto = f"**{cambio_principal['variable']}** decreció ${cambio_principal['magnitud']:,.0f}"
+                        cambio_texto = f"**{cambio_principal['variable']}** decreció ${abs(cambio_principal['magnitud']):,.0f}"
                 
                 analisis_por_negocio.append(f"**{negocio}** muestra {tendencia_negocio} con {cambio_texto}")
         
         if analisis_por_negocio:
-            storytelling += "Por segmento, " + ", ".join(analisis_por_negocio) + ". "
+            storytelling += "Por segmento, " + ", ".join(analisis_por_negocio) + ". \n\n"
         
         # Recomendaciones estratégicas
         if len(cambios_negativos) > len(cambios_positivos):
@@ -4195,7 +4195,8 @@ def main():
                     st.markdown("🤖 **Bot:**")
                     # Procesar el contenido para convertir **texto** a markdown
                     content = message["content"]
-                    st.markdown(content)
+                    # Renderizar con unsafe_allow_html para que el HTML funcione correctamente
+                    st.markdown(content, unsafe_allow_html=True)
     
     # Input de usuario
     user_input = st.text_input("Escribe tu consulta:", key="user_input")
