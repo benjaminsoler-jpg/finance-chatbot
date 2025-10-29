@@ -1598,7 +1598,7 @@ class FinancialChatbot:
             else:
                 # Lógica original para múltiples variables
                 # Primero mostrar rates (porcentajes)
-                analysis += "  📊 **Rates (Porcentajes):**\n"
+                analysis += "  📊 **Rates (Porcentajes):**\n\n"
                 for variable in rate_variables:
                     if variable in variables_clave:
                         analysis += f"    📈 **{variable}:**\n"
@@ -1617,7 +1617,7 @@ class FinancialChatbot:
                             if escenario:
                                 data = data[data['Escenario'] == escenario]
                             
-                            analysis += f"    • {periodo}:\n"
+                            analysis += f"      • {periodo}:\n"
                             
                             if len(data) > 0:
                                 # Agrupar por cohort y mostrar valores
@@ -1632,36 +1632,21 @@ class FinancialChatbot:
                                     # Formatear según el tipo de variable
                                     if variable == 'Term':
                                         # Term es un número entero
-                                        analysis += f"      - {cohort_name}: {valor:.0f}\n"
+                                        analysis += f"        - {cohort_name}: {valor:.0f}\n"
                                     elif variable in ['Rate All In', 'Risk Rate', 'Fund Rate']:
                                         # Rates son porcentajes
-                                        analysis += f"      - {cohort_name}: {valor*100:.2f}%\n"
+                                        analysis += f"        - {cohort_name}: {valor*100:.2f}%\n"
                                     else:
                                         # Otras variables (por si acaso)
-                                        analysis += f"      - {cohort_name}: {valor:.2f}\n"
+                                        analysis += f"        - {cohort_name}: {valor:.2f}\n"
                             else:
-                                analysis += f"      - No hay datos disponibles\n"
+                                analysis += f"        - No hay datos disponibles\n"
+                        analysis += "\n"  # Salto de línea después de cada variable
                 
-                for periodo in periodos:
-                    # Construir filtro base
-                    filtro = (
-                        (self.df['Elaboracion'] == elaboracion) & 
-                        (self.df['Periodo'] == periodo) & 
-                        (self.df['Concepto'] == variable) &
-                        (self.df['Negocio'] == negocio)
-                    )
-                    
-                    # Agregar filtro de escenario si se especifica
-                    if escenario:
-                        filtro = filtro & (self.df['Escenario'] == escenario)
-                    
-                    data = self.df[filtro]
-                    
-                    # Esta sección está duplicada - se elimina para evitar redundancia
                 analysis += "\n"
             
                 # Luego mostrar variables monetarias
-                analysis += "  💰 **Valores Monetarios:**\n"
+                analysis += "  💰 **Valores Monetarios:**\n\n"
                 for variable in sum_variables:
                     if variable in variables_clave:
                         analysis += f"    📈 **{variable}:**\n"
@@ -1688,6 +1673,8 @@ class FinancialChatbot:
                                 analysis += f"      • {periodo}: ${valor:,.0f}\n"
                             else:
                                 analysis += f"      • {periodo}: Sin datos\n"
+                        
+                        analysis += "\n"  # Salto de línea antes de la tendencia
                         
                         if len(valores_por_periodo) > 1:
                             # Calcular tendencia
@@ -1723,7 +1710,7 @@ class FinancialChatbot:
                     cambios_significativos.extend(cambios)
         
         # Análisis automático de variables - Solo cambios significativos
-        analysis += "📊 **Análisis Automático de Variables:**\n\n"
+        analysis += "\n📊 **Análisis Automático de Variables:**\n\n"
         
         # Analizar cada variable para todos los negocios
         for variable in variables_clave:
@@ -1733,14 +1720,14 @@ class FinancialChatbot:
                 if rate_analysis.strip():  # Solo mostrar si hay cambios significativos
                     analysis += f"🔍 **{variable}:**\n"
                     analysis += rate_analysis
-                    analysis += "\n"
+                    analysis += "\n\n"
             else:
                 # Análisis para variables monetarias
                 monetary_analysis = self._analyze_monetary_variable(variable, elaboracion, periodos, escenario, negocios)
                 if monetary_analysis.strip():  # Solo mostrar si hay cambios significativos
                     analysis += f"🔍 **{variable}:**\n"
                     analysis += monetary_analysis
-                    analysis += "\n"
+                    analysis += "\n\n"
         
         # Storytelling completo
         analysis += self._generate_storytelling(elaboracion, periodos, escenario, negocios)
@@ -1866,7 +1853,7 @@ class FinancialChatbot:
             return "  ℹ️ No hay cambios significativos en este período.\n"
         
         # Análisis por negocio - comparación entre períodos
-        analysis += "  🏢 **Análisis por Negocio:**\n"
+        analysis += "\n  🏢 **Análisis por Negocio:**\n"
         for negocio in negocios:
             negocio_data = df_analysis[df_analysis['negocio'] == negocio]
             if len(negocio_data) > 0:
@@ -1890,7 +1877,7 @@ class FinancialChatbot:
                     analysis += f"    • {negocio}: {emoji} {tendencia} {abs(cambio):.2f}pp ({abs(porcentaje):.1f}%)\n"
         
         # Análisis por cohort - comparación entre períodos
-        analysis += "  📊 **Análisis por Cohort:**\n"
+        analysis += "\n  📊 **Análisis por Cohort:**\n"
         for cohort in df_analysis['cohort'].unique():
             cohort_data = df_analysis[df_analysis['cohort'] == cohort]
             if len(cohort_data) > 0:
@@ -1983,7 +1970,7 @@ class FinancialChatbot:
             return "  ℹ️ No hay cambios significativos en este período.\n"
         
         # Análisis por negocio - comparación entre períodos
-        analysis += "  🏢 **Análisis por Negocio:**\n"
+        analysis += "\n  🏢 **Análisis por Negocio:**\n"
         for negocio in negocios:
             negocio_data = df_analysis[df_analysis['negocio'] == negocio]
             if len(negocio_data) > 0:
@@ -2008,7 +1995,7 @@ class FinancialChatbot:
         
         # Análisis de concentración por período
         if variable == 'Originacion Prom':
-            analysis += "  🎯 **Concentración por Período:**\n"
+            analysis += "\n  🎯 **Concentración por Período:**\n"
             for periodo in periodos_ordenados:
                 periodo_data = df_analysis[df_analysis['periodo'] == periodo]
                 negocio_periodo = periodo_data.groupby('negocio')['valor'].sum().round(0)
