@@ -1467,16 +1467,31 @@ class FinancialChatbot:
         # Extraer elaboración y cantidad de meses
         elaboracion_match = re.search(r'elaboraci[oó]n\s+(\d{2})-01-2025', query.lower())
         
+        # Buscar "mes pasado" o "el mes pasado" (sin especificar elaboración)
+        mes_pasado_match = re.search(r'\b(mes\s+pasado|el\s+mes\s+pasado)\b', query.lower())
+        
         # Buscar "ultimos N meses" o "N ultimo(s) meses"
         meses_match = re.search(r'ultimos?\s+(\d+)\s+meses?', query.lower())
         if not meses_match:
             meses_match = re.search(r'(\d+)\s+ultimos?\s+meses?', query.lower())
         
-        if not elaboracion_match:
+        # Si no hay elaboración explícita pero hay "mes pasado", usar la más reciente
+        if not elaboracion_match and mes_pasado_match:
+            if self.df is not None and 'Elaboracion' in self.df.columns:
+                # Obtener la elaboración más reciente disponible
+                elaboraciones_unicas = sorted(self.df['Elaboracion'].unique(), reverse=True)
+                if len(elaboraciones_unicas) > 0:
+                    elaboracion = elaboraciones_unicas[0]
+                    meses = 1  # "mes pasado" = 1 mes
+                else:
+                    return None
+            else:
+                return None
+        elif not elaboracion_match:
             return None
-        
-        elaboracion = elaboracion_match.group(1) + '-01-2025'
-        meses = int(meses_match.group(1)) if meses_match else 3
+        else:
+            elaboracion = elaboracion_match.group(1) + '-01-2025'
+            meses = int(meses_match.group(1)) if meses_match else 3
         
         # Extraer filtros adicionales
         escenario = None
@@ -1494,9 +1509,15 @@ class FinancialChatbot:
                 mes_anterior += 12
             periodos.append(f"{mes_anterior:02d}-01-2025")
         
-        analysis = f"📊 **Rendimiento de los Últimos {meses} Meses**\n"
-        analysis += f"🎯 **Elaboración base:** {elaboracion}\n"
-        analysis += f"📅 **Períodos analizados:** {', '.join(periodos)}\n"
+        # Ajustar mensaje según si es "mes pasado" o "últimos N meses"
+        if mes_pasado_match and meses == 1:
+            analysis = f"📊 **Rendimiento del Mes Pasado**\n"
+            analysis += f"🎯 **Elaboración base (más reciente):** {elaboracion}\n"
+            analysis += f"📅 **Período analizado:** {periodos[0]}\n"
+        else:
+            analysis = f"📊 **Rendimiento de los Últimos {meses} Meses**\n"
+            analysis += f"🎯 **Elaboración base:** {elaboracion}\n"
+            analysis += f"📅 **Períodos analizados:** {', '.join(periodos)}\n"
         if escenario:
             analysis += f"🎯 **Escenario:** {escenario}\n"
         analysis += "\n"
@@ -4009,8 +4030,9 @@ class FinancialChatbot:
                 if rolling_analysis:
                     return rolling_analysis
             
-            # Verificar si es una consulta de "últimos N meses" (PRIORIDAD MEDIA)
-            if ('ultimos' in user_message.lower() or 'ultimo' in user_message.lower()) and 'meses' in user_message.lower():
+            # Verificar si es una consulta de "últimos N meses" o "mes pasado" (PRIORIDAD MEDIA)
+            if (('ultimos' in user_message.lower() or 'ultimo' in user_message.lower()) and 'meses' in user_message.lower()) or \
+               ('mes pasado' in user_message.lower() or 'el mes pasado' in user_message.lower()):
                 months_analysis = self.analyze_last_months_performance(user_message)
                 if months_analysis:
                     return months_analysis
